@@ -1,0 +1,78 @@
+//! Generates Random Numbers for use in Prime Number Choosing
+
+use rand::rngs::EntropyRng;
+use rand::Rng;
+use num_bigint::BigUint;
+
+/// A Number generator that creates random numbers through collecting entropy on the Operating System
+/// First, tries to collect entropy from operations occuring on the Operating System
+/// If that fails to generate enough entropy, then this will fallback to generating entropy from
+/// "System Jitters" (Random number generator based on jitter in the CPU execution time, and jitter in memory access time. This is significantly slower than OS operations).
+/// For more information on random number gens, take a gander at rand::rngs::EntropyRng
+#[derive(Default)]
+struct NumberGenerator {
+    size: usize,
+    generator: EntropyRng
+}
+
+impl NumberGenerator {
+
+    /// Instantiate a new NumberGenerator
+    fn new(size: usize) -> Self {
+        NumberGenerator {
+            size: size,
+            generator: EntropyRng::new()
+        }
+    }
+}
+
+// returns number of u8 vector elements corresponds to one bit-size
+// EX: a u32 vector with 3 elements is 96 bits in size
+fn bit_size(size: usize) -> usize {
+    size / 32
+}
+
+/// An Iterator which spits out a new random number (based on rand::rng::EntropyRng) every iteration
+impl Iterator for NumberGenerator {
+    type Item = BigUint;
+
+    fn next(&mut self) -> Option<BigUint> {
+        let mut number = vec![0; self.size];
+        let len = number.len();
+        self.generator.fill(number.as_mut_slice());
+        number[0] |= 1 << 0; // set LSB to 1 (so it is odd)
+        number[len - 1] |= 1 << 31; // set MSB to 1 (so we know it is exactly the length specified)
+
+        Some(BigUint::from_slice(number.as_slice()))
+    }
+}
+
+
+pub struct Primes {
+    /// P
+    p: BigUint,
+    /// Q
+    q: BigUint,
+    /// The Size of both P and Q. This size (in bits) is guaranteed to be the same for both P and Q
+    size: u64
+}
+
+/// Finds primes based on the NumberGenerator
+pub struct PrimeFinder {
+
+
+
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn should_generate_random_numbers() {
+       let gen = NumberGenerator::new(16);
+        let numbers = gen.take(4).for_each(|x| {
+            println!("Number: {:#}", x);
+        });
+    }
+}
