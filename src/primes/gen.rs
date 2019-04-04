@@ -70,7 +70,13 @@ pub struct Primes {
 /// Finds primes based on the NumberGenerator
 pub struct PrimeFinder {
 
+    fn fermat(&self) {
 
+    }
+
+    fn rabin_miller(&self) {
+
+    }
 }
 
 
