@@ -15,7 +15,9 @@ use failure::{/*ResultExt,*/ Error};
 /// For more information on random number gens, take a gander at rand::rngs::EntropyRng
 #[derive(Default)]
 struct NumberGenerator {
+    /// Total Size of Public key (n = pq) where n is the public key
     size: usize,
+    /// Library being used for Random Number Generation
     generator: EntropyRng
 }
 
@@ -34,7 +36,7 @@ impl NumberGenerator {
     }
 }
 
-// returns number of u8 vector elements corresponds to one bit-size
+// returns number of u8 vector elements corresponds to one bit-size for one of p or q
 // EX: a u32 vector with 3 elements is 96 bits in size
 fn bit_size(size: usize) -> usize {
     (size / 2 ) / 32
