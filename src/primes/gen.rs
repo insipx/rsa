@@ -4,7 +4,8 @@ use super::*;
 
 use rand::rngs::EntropyRng;
 use rand::Rng;
-use num_bigint::BigUint;
+use num_bigint::{BigUint, ToBigUint};
+use num_bigint::RandBigInt;
 
 use failure::{/*ResultExt,*/ Error};
 
@@ -29,6 +30,7 @@ impl NumberGenerator {
         if size < MINIMUM_KEY_LENGTH || !((size & (size - 1 )) == 0) {
             Err(ErrorKind::InvalidKeyLength)?
         }
+
         Ok(NumberGenerator {
             size: size,
             generator: EntropyRng::new()
@@ -50,7 +52,7 @@ impl Iterator for NumberGenerator {
         let mut number = vec![0; bit_size(self.size)];
         let len = number.len();
         self.generator.fill(number.as_mut_slice());
-        number[0] |= 1 << 0; // set LSB to 1 (so it is odd)
+        number[0] |= 1; //number[0] |= 1 << 0; // set LSB to 1 (so it is odd)
         number[len - 1] |= 1 << 31; // set MSB to 1 (so we know it is exactly the length specified)
 
         Some(BigUint::from_slice(number.as_slice()))
@@ -67,15 +69,26 @@ pub struct Primes {
     size: u64
 }
 
+struct PrimeFinder;
+
 /// Finds primes based on the NumberGenerator
-pub struct PrimeFinder {
+impl PrimeFinder {
 
-    fn fermat(&self) {
-
+    fn find(candidate: &BigUint) -> bool {
+        false
     }
 
-    fn rabin_miller(&self) {
+    /// If this function returns false, then the candidate is composite
+    /// If this function returns true, then the candidate is probably not composite
+    fn fermat(candidate: &BigUint) -> Result<bool, Error> {
+        let mut rng = rand::thread_rng();
+        let low = &1usize.to_biguint().ok_or(ErrorKind::CouldNotConvert)?;
+        let a = rng.gen_biguint_range(&low, &(candidate - 1usize));
+        Ok(a.modpow(&(candidate - 1usize), &candidate) == BigUint::from(1usize))
+    }
 
+    fn rabin_miller(candidate: &BigUint) {
+               
     }
 }
 
@@ -110,4 +123,17 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn should_recognize_composite_numbers() {
+        let num = 20usize.to_biguint().unwrap();
+        assert!(!PrimeFinder::fermat(&num).unwrap());
+    }
+
+    #[test]
+    fn should_recognize_possibly_prime() {
+        let num = 13usize.to_biguint().unwrap();
+        assert!(PrimeFinder::fermat(&num).unwrap());
+    }
+
 }
