@@ -6,13 +6,15 @@ use rand::rngs::EntropyRng;
 use rand::Rng;
 use num_bigint::{BigUint, ToBigUint};
 use num_bigint::RandBigInt;
+use num_traits::identities::{One, Zero};
 
 use failure::{/*ResultExt,*/ Error};
 
 /// A Number generator that creates random numbers through collecting entropy on the Operating System
 /// First, tries to collect entropy from operations occuring on the Operating System
 /// If that fails to generate enough entropy, then this will fallback to generating entropy from
-/// "System Jitters" (Random number generator based on jitter in the CPU execution time, and jitter in memory access time. This is significantly slower than OS operations).
+/// "System Jitters" (Random number generator based on jitter in the CPU execution time, and jitter in memory access time.
+/// This is significantly slower than OS operations).
 /// For more information on random number gens, take a gander at rand::rngs::EntropyRng
 #[derive(Default)]
 struct NumberGenerator {
@@ -69,26 +71,69 @@ pub struct Primes {
     size: u64
 }
 
-struct PrimeFinder;
+enum ProbableVariant {
+    Prime,
+    Composite
+}
 
-/// Finds primes based on the NumberGenerator
-impl PrimeFinder {
+/// Finds primes based on the NumberGeneratorA
+/// **WARNING** These functions assume an odd `candidate` input that is greater than 3
+impl ProbableVariant {
 
-    fn find(candidate: &BigUint) -> bool {
-        false
+    fn find(candidate: &BigUint) -> Result<Self, Error> {
+        unimplemented!();
     }
 
     /// If this function returns false, then the candidate is composite
     /// If this function returns true, then the candidate is probably not composite
-    fn fermat(candidate: &BigUint) -> Result<bool, Error> {
+    fn fermat(candidate: &BigUint) -> Self {
         let mut rng = rand::thread_rng();
-        let low = &1usize.to_biguint().ok_or(ErrorKind::CouldNotConvert)?;
-        let a = rng.gen_biguint_range(&low, &(candidate - 1usize));
-        Ok(a.modpow(&(candidate - 1usize), &candidate) == BigUint::from(1usize))
+        let a = rng.gen_biguint_range(&BigUint::one(), &(candidate - BigUint::one()));
+
+        if a.modpow(&(candidate - BigUint::one()), &candidate) == BigUint::one() {
+            ProbableVariant::Prime
+        } else {
+            ProbableVariant::Composite
+        }
     }
 
-    fn rabin_miller(candidate: &BigUint) {
-               
+    /// The Candidate prime number and how many rounds (k) to process or miller-rabin
+    /// References: https://stackoverflow.com/questions/6325576/how-many-iterations-of-rabin-miller-should-i-use-for-cryptographic-safe-primes
+    /// (How many rounds of miller rabin to use)
+    fn rabin_miller(candidate: &BigUint, rounds: usize) -> Self {
+
+        let candidate_minus_one = candidate - BigUint::one();
+        let mut rng = rand::thread_rng();
+        let mut s: usize = 0;
+        let mut d: BigUint = candidate - 1usize;
+
+        while d.clone() & BigUint::one() == BigUint::zero() {
+            s += 1;
+            d = d / BigUint::from(2usize);
+        }
+
+        for i in 1..rounds {
+            let a = rng.gen_biguint_range(&BigUint::one(), &(candidate - 2usize));
+            let mut x = a.modpow(&d, &candidate);
+            if x == BigUint::one() || x == candidate_minus_one {
+                continue;
+            }
+            let mut r = 0;
+            for _ in 1..s {
+                x = x.modpow(&BigUint::from(2usize), &candidate);
+
+                if x == BigUint::one() {
+                    return ProbableVariant::Composite;
+                } else if x == candidate_minus_one {
+                    break;
+                }
+                r += 1;
+            }
+            if r == s {
+                return ProbableVariant::Composite;
+            }
+        }
+        ProbableVariant::Prime
     }
 }
 
