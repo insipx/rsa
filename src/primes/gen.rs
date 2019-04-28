@@ -71,6 +71,7 @@ pub struct Primes {
     size: u64
 }
 
+#[derive(Debug, Clone, PartialEq)]
 enum ProbableVariant {
     Prime,
     Composite
@@ -172,13 +173,14 @@ mod test {
     #[test]
     fn should_recognize_composite_numbers() {
         let num = 20usize.to_biguint().unwrap();
-        assert!(!PrimeFinder::fermat(&num).unwrap());
+        assert!(ProbableVariant::fermat(&num) == ProbableVariant::Composite);
+        assert!(ProbableVariant::rabin_miller(&num, 40) == ProbableVariant::Composite);
     }
 
     #[test]
     fn should_recognize_possibly_prime() {
-        let num = 13usize.to_biguint().unwrap();
-        assert!(PrimeFinder::fermat(&num).unwrap());
+        let num = 1847usize.to_biguint().unwrap();
+        assert!(ProbableVariant::fermat(&num) == ProbableVariant::Prime);
+        assert!(ProbableVariant::rabin_miller(&num, 40) == ProbableVariant::Prime);
     }
-
 }
