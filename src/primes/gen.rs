@@ -1,5 +1,6 @@
 //! Generates Random Numbers for use in Prime Number Choosing
 use crate::err::ErrorKind;
+use super::primedb::PrimeDB;
 use super::*;
 
 use rand::rngs::EntropyRng;
@@ -17,9 +18,9 @@ use failure::{/*ResultExt,*/ Error};
 /// This is significantly slower than OS operations).
 /// For more information on random number gens, take a gander at rand::rngs::EntropyRng
 #[derive(Default)]
-struct NumberGenerator {
+pub struct NumberGenerator {
     /// Total Size of Public key (n = pq) where n is the public key
-    size: usize,
+    size: KeySize,
     /// Library being used for Random Number Generation
     generator: EntropyRng
 }
@@ -27,9 +28,12 @@ struct NumberGenerator {
 impl NumberGenerator {
 
     /// Instantiate a new NumberGenerator
-    fn new(size: usize) -> Result<Self, Error> {
+    /// "size" corresponds to the size in bits the number must be
+    /// Size must be larger than 512 and a power of 2
+    pub fn new(size: KeySize) -> Result<Self, Error> {
+
         // must be larger than 512 bits and a power of 2
-        if size < MINIMUM_KEY_LENGTH || !((size & (size - 1 )) == 0) {
+        if size.as_num() < MINIMUM_KEY_LENGTH || !((size.as_num() & (size.as_num() - 1 )) == 0) {
             Err(ErrorKind::InvalidKeyLength)?
         }
 
@@ -51,7 +55,7 @@ impl Iterator for NumberGenerator {
     type Item = BigUint;
 
     fn next(&mut self) -> Option<BigUint> {
-        let mut number = vec![0; bit_size(self.size)];
+        let mut number = vec![0; bit_size(self.size.as_num())];
         let len = number.len();
         self.generator.fill(number.as_mut_slice());
         number[0] |= 1; //number[0] |= 1 << 0; // set LSB to 1 (so it is odd)
@@ -60,7 +64,6 @@ impl Iterator for NumberGenerator {
         Some(BigUint::from_slice(number.as_slice()))
     }
 }
-
 
 pub struct Primes {
     /// P
@@ -81,13 +84,30 @@ enum ProbableVariant {
 /// **WARNING** These functions assume an odd `candidate` input that is greater than 3
 impl ProbableVariant {
 
-    fn find(candidate: &BigUint) -> Result<Self, Error> {
-        unimplemented!();
+    // check if a candidate is prime or not by running all tests on it
+    pub fn find(candidate: &BigUint) -> Self {
+
+        return match (Self::small_primes(candidate), Self::fermat(candidate), Self::rabin_miller(candidate, 40)) {
+            (ProbableVariant::Prime, ProbableVariant::Prime, ProbableVariant::Prime) => ProbableVariant::Prime,
+            _ => ProbableVariant::Composite
+        };
+    }
+
+    /// Check if the candidate is divisible by small primes
+    /// Small primes are stored in a JSON file
+    pub fn small_primes(candidate: &BigUint) -> Self {
+        let primes = PrimeDB::get();
+        for (key, prime) in primes.iter() {
+            if (candidate % prime) == BigUint::zero() && candidate != &BigUint::from(*prime) {
+                return ProbableVariant::Composite;
+            }
+        }
+        ProbableVariant::Prime
     }
 
     /// If this function returns false, then the candidate is composite
     /// If this function returns true, then the candidate is probably not composite
-    fn fermat(candidate: &BigUint) -> Self {
+    pub fn fermat(candidate: &BigUint) -> Self {
         let mut rng = rand::thread_rng();
         let a = rng.gen_biguint_range(&BigUint::one(), &(candidate - BigUint::one()));
 
@@ -101,17 +121,19 @@ impl ProbableVariant {
     /// The Candidate prime number and how many rounds (k) to process or miller-rabin
     /// References: https://stackoverflow.com/questions/6325576/how-many-iterations-of-rabin-miller-should-i-use-for-cryptographic-safe-primes
     /// (How many rounds of miller rabin to use)
-    fn rabin_miller(candidate: &BigUint, rounds: usize) -> Self {
+    pub fn rabin_miller(candidate: &BigUint, rounds: usize) -> Self {
 
         let candidate_minus_one = candidate - BigUint::one();
         let mut rng = rand::thread_rng();
         let mut s: usize = 0;
-        let mut d: BigUint = candidate - 1usize;
+        let mut d: BigUint = candidate_minus_one.clone();
 
+        // sanity check to ensure candidate is not even
         if candidate % 2usize == BigUint::zero() {
             return ProbableVariant::Composite;
         }
 
+        // find a d such that 2^s*d = n - 1
         while (d.clone() % 2usize) == BigUint::zero() {
             s += 1;
             d = d / BigUint::from(2usize);
@@ -121,7 +143,6 @@ impl ProbableVariant {
             let a = rng.gen_biguint_range(&BigUint::from(2usize), &(candidate - 2usize));
             let mut x = a.modpow(&d, &candidate);
             if x == BigUint::one() || x == candidate_minus_one {
-                dbg!("We Continue");
                 continue;
             }
             let mut r = 1;
@@ -129,20 +150,16 @@ impl ProbableVariant {
                 x = x.modpow(&BigUint::from(2usize), &candidate);
 
                 if x == BigUint::one() {
-                    dbg!("here x == 1");
                     return ProbableVariant::Composite;
                 } else if x == candidate_minus_one {
-                    dbg!("Here, x == minus 1");
                     break;
                 }
                 r += 1;
             }
             if r == s {
-                dbg!("r == s");
                 return ProbableVariant::Composite;
             }
         }
-        dbg!("All the way");
         ProbableVariant::Prime
     }
 }
@@ -151,24 +168,10 @@ impl ProbableVariant {
 #[cfg(test)]
 mod test {
     use super::*;
-    #[test]
-    #[should_panic]
-    fn should_not_create_numbers_with_less_than_512bits() {
-        let gen = NumberGenerator::new(32).unwrap();
-        let numbers = gen.take(4).for_each(|x| {
-            println!("Number: {:#}", x);
-        });
-    }
-
-    #[test]
-    #[should_panic]
-    fn should_fail_if_keylength_not_power_of_two() {
-        NumberGenerator::new(31).unwrap();
-    }
 
     #[test]
     fn should_generate_random_numbers() {
-        let gen = NumberGenerator::new(512).unwrap();
+        let gen = NumberGenerator::new(KeySize::FiveTwelve).unwrap();
         let numbers = gen.take(10).collect::<Vec<BigUint>>();
         for i in 0..10 {
             for j in 0..10 {
@@ -183,7 +186,7 @@ mod test {
     fn should_recognize_composite_numbers() {
         let num = 20usize.to_biguint().unwrap();
         assert!(ProbableVariant::fermat(&num) == ProbableVariant::Composite);
-        // assert!(ProbableVariant::rabin_miller(&num, 40) == ProbableVariant::Composite);
+        assert!(ProbableVariant::rabin_miller(&num, 40) == ProbableVariant::Composite);
         let num = 2695usize.to_biguint().unwrap();
         assert!(ProbableVariant::fermat(&num) == ProbableVariant::Composite);
         assert!(ProbableVariant::rabin_miller(&num, 40) == ProbableVariant::Composite);
@@ -197,5 +200,13 @@ mod test {
         let num = 2693usize.to_biguint().unwrap();
         assert!(ProbableVariant::fermat(&num) == ProbableVariant::Prime);
         assert!(ProbableVariant::rabin_miller(&num, 40) == ProbableVariant::Prime);
+    }
+
+    #[test]
+    fn should_test_small_primes() {
+        let num = 1847usize.to_biguint().unwrap();
+        assert!(ProbableVariant::small_primes(&num) == ProbableVariant::Prime);
+        let num = 20usize.to_biguint().unwrap();
+        assert!(ProbableVariant::small_primes(&num) == ProbableVariant::Composite);
     }
 }
