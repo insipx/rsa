@@ -9,7 +9,7 @@ use num_bigint::{BigUint, ToBigUint};
 use num_bigint::RandBigInt;
 use num_traits::identities::{One, Zero};
 
-use failure::{/*ResultExt,*/ Error};
+use failure::{Error};
 
 /// A Number generator that creates random numbers through collecting entropy on the Operating System
 /// First, tries to collect entropy from operations occuring on the Operating System
@@ -65,17 +65,8 @@ impl Iterator for NumberGenerator {
     }
 }
 
-pub struct Primes {
-    /// P
-    p: BigUint,
-    /// Q
-    q: BigUint,
-    /// The Size of both P and Q. This size (in bits) is guaranteed to be the same for both P and Q
-    size: u64
-}
-
 #[derive(Debug, Clone, PartialEq)]
-enum ProbableVariant {
+pub enum ProbableVariant {
     Prime,
     Composite
 }
@@ -166,7 +157,7 @@ impl ProbableVariant {
 
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
@@ -208,5 +199,13 @@ mod test {
         assert!(ProbableVariant::small_primes(&num) == ProbableVariant::Prime);
         let num = 20usize.to_biguint().unwrap();
         assert!(ProbableVariant::small_primes(&num) == ProbableVariant::Composite);
+    }
+
+    #[test]
+    fn should_test_prime() {
+        let num = 1847usize.to_biguint().unwrap();
+        assert!(ProbableVariant::find(&num) == ProbableVariant::Prime);
+        let num = 1848usize.to_biguint().unwrap();
+        assert!(ProbableVariant::find(&num) == ProbableVariant::Composite);
     }
 }

@@ -11,7 +11,9 @@ pub enum ErrorKind {
     #[fail(display = "The key length entered is too small, or not a power of 2")]
     InvalidKeyLength,
     #[fail(display = "Could not convert native integer to large integer library")]
-    CouldNotConvert
+    CouldNotConvert,
+    #[fail(display = "Could not Find A Suitable Prime Number")]
+    PrimeNotFound
 }
 
 

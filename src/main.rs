@@ -1,5 +1,6 @@
+#![feature(test)]
+pub mod primes;
 mod rsa;
-mod primes;
 mod err;
 
 fn main() {
