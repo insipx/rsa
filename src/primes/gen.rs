@@ -108,32 +108,41 @@ impl ProbableVariant {
         let mut s: usize = 0;
         let mut d: BigUint = candidate - 1usize;
 
-        while d.clone() & BigUint::one() == BigUint::zero() {
+        if candidate % 2usize == BigUint::zero() {
+            return ProbableVariant::Composite;
+        }
+
+        while (d.clone() % 2usize) == BigUint::zero() {
             s += 1;
             d = d / BigUint::from(2usize);
         }
 
-        for i in 1..rounds {
-            let a = rng.gen_biguint_range(&BigUint::one(), &(candidate - 2usize));
+        for _ in 0..rounds {
+            let a = rng.gen_biguint_range(&BigUint::from(2usize), &(candidate - 2usize));
             let mut x = a.modpow(&d, &candidate);
             if x == BigUint::one() || x == candidate_minus_one {
+                dbg!("We Continue");
                 continue;
             }
-            let mut r = 0;
-            for _ in 1..s {
+            let mut r = 1;
+            while r < s {
                 x = x.modpow(&BigUint::from(2usize), &candidate);
 
                 if x == BigUint::one() {
+                    dbg!("here x == 1");
                     return ProbableVariant::Composite;
                 } else if x == candidate_minus_one {
+                    dbg!("Here, x == minus 1");
                     break;
                 }
                 r += 1;
             }
             if r == s {
+                dbg!("r == s");
                 return ProbableVariant::Composite;
             }
         }
+        dbg!("All the way");
         ProbableVariant::Prime
     }
 }
@@ -174,12 +183,18 @@ mod test {
     fn should_recognize_composite_numbers() {
         let num = 20usize.to_biguint().unwrap();
         assert!(ProbableVariant::fermat(&num) == ProbableVariant::Composite);
+        // assert!(ProbableVariant::rabin_miller(&num, 40) == ProbableVariant::Composite);
+        let num = 2695usize.to_biguint().unwrap();
+        assert!(ProbableVariant::fermat(&num) == ProbableVariant::Composite);
         assert!(ProbableVariant::rabin_miller(&num, 40) == ProbableVariant::Composite);
     }
 
     #[test]
     fn should_recognize_possibly_prime() {
         let num = 1847usize.to_biguint().unwrap();
+        assert!(ProbableVariant::fermat(&num) == ProbableVariant::Prime);
+        assert!(ProbableVariant::rabin_miller(&num, 40) == ProbableVariant::Prime);
+        let num = 2693usize.to_biguint().unwrap();
         assert!(ProbableVariant::fermat(&num) == ProbableVariant::Prime);
         assert!(ProbableVariant::rabin_miller(&num, 40) == ProbableVariant::Prime);
     }
