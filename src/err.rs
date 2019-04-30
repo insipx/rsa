@@ -13,7 +13,9 @@ pub enum ErrorKind {
     #[fail(display = "Could not convert native integer to large integer library")]
     CouldNotConvert,
     #[fail(display = "Could not Find A Suitable Prime Number")]
-    PrimeNotFound
+    PrimeNotFound,
+    #[fail(display = "Error Loading Keys into or From the Database")]
+    Database
 }
 
 

@@ -55,9 +55,9 @@ impl PrimeFinder {
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
+    // extern crate test;
     use super::*;
-    use test::{Bencher, black_box};
+    // use test::{Bencher, black_box};
 
     #[test]
     fn should_find_large_prime() {
@@ -67,6 +67,7 @@ mod tests {
         println!("Prime Number Found: {:?}", prime);
     }
 
+    /*
     #[bench]
     fn bench_2048bit_key(b: &mut Bencher) {
         b.iter(|| {
@@ -80,4 +81,5 @@ mod tests {
             PrimeFinder::find(KeySize::FiveTwelve).unwrap();
         });
     }
+    */
 }

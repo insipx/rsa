@@ -78,10 +78,19 @@ impl ProbableVariant {
     // check if a candidate is prime or not by running all tests on it
     pub fn find(candidate: &BigUint) -> Self {
 
-        return match (Self::small_primes(candidate), Self::fermat(candidate), Self::rabin_miller(candidate, 40)) {
-            (ProbableVariant::Prime, ProbableVariant::Prime, ProbableVariant::Prime) => ProbableVariant::Prime,
-            _ => ProbableVariant::Composite
-        };
+        if Self::small_primes(candidate) == ProbableVariant::Composite {
+            return ProbableVariant::Composite;
+        }
+
+        if Self::fermat(candidate) == ProbableVariant::Composite {
+            return ProbableVariant::Composite;
+        }
+
+        if Self::rabin_miller(candidate, 40) == ProbableVariant::Composite {
+            return ProbableVariant::Composite;
+        }
+
+        ProbableVariant::Prime
     }
 
     /// Check if the candidate is divisible by small primes
