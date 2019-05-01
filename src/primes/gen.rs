@@ -8,8 +8,10 @@ use rand::Rng;
 use num_bigint::{BigUint, ToBigUint};
 use num_bigint::RandBigInt;
 use num_traits::identities::{One, Zero};
-
 use failure::{Error};
+
+
+const MINIMUM_KEY_LENGTH: usize = 256;
 
 /// A Number generator that creates random numbers through collecting entropy on the Operating System
 /// First, tries to collect entropy from operations occuring on the Operating System
@@ -17,23 +19,22 @@ use failure::{Error};
 /// "System Jitters" (Random number generator based on jitter in the CPU execution time, and jitter in memory access time.
 /// This is significantly slower than OS operations).
 /// For more information on random number gens, take a gander at rand::rngs::EntropyRng
-#[derive(Default)]
-pub struct NumberGenerator {
+pub struct NumberGenerator<'a> {
     /// Total Size of Public key (n = pq) where n is the public key
-    size: KeySize,
+    size: &'a KeySize,
     /// Library being used for Random Number Generation
     generator: EntropyRng
 }
 
-impl NumberGenerator {
+impl<'a> NumberGenerator<'a> {
 
     /// Instantiate a new NumberGenerator
     /// "size" corresponds to the size in bits the number must be
     /// Size must be larger than 512 and a power of 2
-    pub fn new(size: KeySize) -> Result<Self, Error> {
+    pub fn new(size: &'a KeySize) -> Result<Self, Error> {
 
         // must be larger than 512 bits and a power of 2
-        if size.as_num() < MINIMUM_KEY_LENGTH || !((size.as_num() & (size.as_num() - 1 )) == 0) {
+        if size.as_num() < MINIMUM_KEY_LENGTH  || !((size.as_num() & (size.as_num() - 1 )) == 0) {
             Err(ErrorKind::InvalidKeyLength)?
         }
 
@@ -47,11 +48,12 @@ impl NumberGenerator {
 // returns number of u8 vector elements corresponds to one bit-size for one of p or q
 // EX: a u32 vector with 3 elements is 96 bits in size
 fn bit_size(size: usize) -> usize {
-    (size / 2 ) / 32
+    size / 32
 }
 
 /// An Iterator which spits out a new random number (based on rand::rng::EntropyRng) every iteration
-impl Iterator for NumberGenerator {
+/// This takes care of generating the correctly sized Key
+impl<'a> Iterator for NumberGenerator<'a> {
     type Item = BigUint;
 
     fn next(&mut self) -> Option<BigUint> {
@@ -171,7 +173,7 @@ mod tests {
 
     #[test]
     fn should_generate_random_numbers() {
-        let gen = NumberGenerator::new(KeySize::FiveTwelve).unwrap();
+        let gen = NumberGenerator::new(&KeySize::FiveTwelve).unwrap();
         let numbers = gen.take(10).collect::<Vec<BigUint>>();
         for i in 0..10 {
             for j in 0..10 {

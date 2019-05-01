@@ -15,7 +15,11 @@ pub enum ErrorKind {
     #[fail(display = "Could not Find A Suitable Prime Number")]
     PrimeNotFound,
     #[fail(display = "Error Loading Keys into or From the Database")]
-    Database
+    Database,
+    #[fail(display = "Error when parsing bytes during encryption/decryption")]
+    BytesParse,
+    #[fail(display = "User not in Database. Have you created a key?")]
+    UserNotFound
 }
 
 

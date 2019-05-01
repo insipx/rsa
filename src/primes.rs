@@ -1,13 +1,17 @@
 mod gen;
 mod primedb;
+
 use crate::err::ErrorKind;
 use failure::{Error};
 use num_bigint::BigUint;
 use gen::{NumberGenerator, ProbableVariant};
 
-const MINIMUM_KEY_LENGTH: usize = 512;
+//TODO Make panic messages better. This program should never panic
 
+// Minimum KeySize is 512
+#[derive(Debug, Clone, PartialEq)]
 pub enum KeySize {
+    TwoFiftySix,
     FiveTwelve,
     TenTwentyFour,
     TwentyFourtyEight,
@@ -16,8 +20,9 @@ pub enum KeySize {
 }
 
 impl KeySize {
-    fn as_num(&self) -> usize {
+    pub fn as_num(&self) -> usize {
         match *self {
+            KeySize::TwoFiftySix => 256,
             KeySize::FiveTwelve => 512,
             KeySize::TenTwentyFour => 1024,
             KeySize::TwentyFourtyEight => 2048,
@@ -25,14 +30,40 @@ impl KeySize {
             KeySize::EightyOneNinetyTwo => 8192,
         }
     }
-}
 
-impl Default for KeySize {
-    fn default() -> Self {
-        KeySize::TwentyFourtyEight
+    // Panics if keysize is not at least 512
+    pub fn as_half(&self) -> Self {
+        match *self {
+            KeySize::FiveTwelve => KeySize::TwoFiftySix,
+            KeySize::TenTwentyFour => KeySize::FiveTwelve,
+            KeySize::TwentyFourtyEight => KeySize::TenTwentyFour,
+            KeySize::FourtyNinetySix => KeySize::TwentyFourtyEight,
+            KeySize::EightyOneNinetyTwo => KeySize::FourtyNinetySix,
+            _ => panic!("Invalid Key Size. Minimum Key Size is 512 bits"),
+        }
     }
 }
 
+impl From<usize> for KeySize {
+    fn from(size: usize) -> KeySize {
+
+        match size {
+            512  => KeySize::FiveTwelve,
+            1024 => KeySize::TenTwentyFour,
+            2048 => KeySize::TwentyFourtyEight,
+            4096 => KeySize::FourtyNinetySix,
+            8192 => KeySize::EightyOneNinetyTwo,
+            _ => panic!("KeySize is too small or too large. Minimum Size: 512, Max Size: 8192")
+        }
+
+    }
+}
+
+impl Default for KeySize {
+    fn default() -> KeySize {
+        KeySize::TwentyFourtyEight
+    }
+}
 
 pub struct PrimeFinder;
 
@@ -43,7 +74,7 @@ pub struct PrimeFinder;
 // Rather than using a Stateless (Unit Struct), consider making this at least remember the KeySize
 // However, that would be easily done within the RSA Module
 impl PrimeFinder {
-    pub fn find(size: KeySize) -> Result<BigUint, Error> {
+    pub fn find(size: &KeySize) -> Result<BigUint, Error> {
         let mut generator = NumberGenerator::new(size)?;
         if let Some(prime) = generator.find(|x| ProbableVariant::find(x) == ProbableVariant::Prime) {
             return Ok(prime);
@@ -61,9 +92,9 @@ mod tests {
 
     #[test]
     fn should_find_large_prime() {
-        let prime = PrimeFinder::find(KeySize::FiveTwelve).unwrap();
+        let prime = PrimeFinder::find(&KeySize::FiveTwelve).unwrap();
         println!("Prime Number Found: {:?}", prime);
-        let prime = PrimeFinder::find(KeySize::TwentyFourtyEight).unwrap();
+        let prime = PrimeFinder::find(&KeySize::TwentyFourtyEight).unwrap();
         println!("Prime Number Found: {:?}", prime);
     }
 
