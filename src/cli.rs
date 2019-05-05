@@ -21,6 +21,10 @@ pub struct CLI {
     #[structopt(long = "generate", short = "g")]
     generate: Option<String>,
 
+    #[structopt(long = "import", short = "i")]
+    import: Option<String>, // file
+    #[structopt(long = "export", short = "e")]
+    export: Option<String> // file
     // #[structopt(flatten)]
     //verbosity: Verbosity,
 }
@@ -51,7 +55,7 @@ impl Opts {
         if let Some(name) = &self.generate {
             println!("Hello {}. Choose a KeySize (One of 512, 1024, 2048, 4096, 8192)", name);
             let mut input = String::new();
-            std::io::stdin().read_line(&mut input);
+            std::io::stdin().read_line(&mut input)?;
             let key_size: usize = input.trim().parse().unwrap(); // TODO: Get rid of unwrap
             let key_size = KeySize::from(key_size);
             println!("Hold On, Generating Key of size {} and committing to the Database", key_size.as_num());
@@ -67,7 +71,7 @@ impl Opts {
         if let Some(message) = &self.decrypt {
             println!("Who are you?");
             let mut user = String::new();
-            std::io::stdin().read_line(&mut user);
+            std::io::stdin().read_line(&mut user)?;
             println!("{}", self.rsa.decrypt(&user, &message)?);
             Ok(())
         } else {
@@ -79,7 +83,7 @@ impl Opts {
         if let Some(message) = &self.encrypt {
             println!("Who are you encrypting this message to? (Enter the UserNames of Recipients): ");
             let mut user = String::new();
-            std::io::stdin().read_line(&mut user);
+            std::io::stdin().read_line(&mut user)?;
             println!("{}", self.rsa.encrypt(&user, &message)?);
             Ok(())
         } else {

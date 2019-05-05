@@ -5,9 +5,8 @@ use super::*;
 
 use rand::rngs::EntropyRng;
 use rand::Rng;
-use num_bigint::{BigUint, ToBigUint};
-use num_bigint::RandBigInt;
-use num_traits::identities::{One, Zero};
+use num_bigint::{BigUint, RandBigInt};
+use num_traits::{One, Zero};
 use failure::{Error};
 
 
@@ -170,6 +169,7 @@ impl ProbableVariant {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use num_bigint::ToBigUint;
 
     #[test]
     fn should_generate_random_numbers() {

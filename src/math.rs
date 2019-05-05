@@ -3,8 +3,30 @@
 //! These functions are not exposed as public-api because their use is strictly for generating large prime numbers
 //! These are generally helper functions
 use num_bigint::{BigUint, BigInt, ToBigInt, ToBigUint};
-use num_traits::identities::{One, Zero};
+use num_traits::{One, Zero};
 
+
+pub trait Mod<B = Self> {
+    type Output;
+
+    fn modulus(self, rhs: B) -> Self::Output;
+}
+
+impl Mod for BigUint {
+    type Output = BigUint;
+
+    fn modulus(self, rhs: BigUint) -> BigUint {
+        (self.clone() % rhs.clone()) + rhs.clone()
+    }
+}
+
+impl Mod for BigInt {
+    type Output = BigInt;
+
+    fn modulus(self, rhs: BigInt) -> BigInt {
+        (self.clone() % rhs.clone()) + rhs.clone()
+    }
+}
 
 pub fn prime_phi(p: &BigUint, q: &BigUint) -> BigUint {
     (p - BigUint::one()) * (q - BigUint::one())
@@ -13,39 +35,64 @@ pub fn prime_phi(p: &BigUint, q: &BigUint) -> BigUint {
 
 
 // Euclids Extended GCD
-// returns g, x, y so ax + by = gcd(a, b)
-// Ints used here in case of negative numbers. It is all modded so nothing should actually turn negative
 pub fn egcd(a: &BigUint, b: &BigUint) -> (BigInt, BigInt, BigInt) {
-    let (zero, one): (BigInt, BigInt) = (Zero::zero(), One::one());
-    // u_a, v_a, u_b, v_b = 1, 0, 0, 1
-    let (mut u_a, mut v_a, mut u_b, mut v_b) = (one.clone(), zero.clone(), zero.clone(), one.clone());
-    let (mut aa, mut bb) = (a.to_bigint().unwrap(), b.to_bigint().unwrap());
+    let (mut a, mut b) = (a.to_bigint().unwrap(), b.to_bigint().unwrap());
+    let (mut x, mut y, mut u, mut v) = (BigInt::zero(), BigInt::one(), BigInt::one(), BigInt::zero());
 
-    while aa != zero {
-        let q = bb.clone() / aa.clone();
 
-        let new_a = bb.clone() - q.clone() * aa.clone();
-        bb = aa;
-        aa = new_a;
+    let (mut q, mut r, mut m, mut n) = (BigInt::zero(), BigInt::zero(), BigInt::zero(), BigInt::zero());
+    while a != BigInt::zero() {
+        // first tuple
+        q = b.clone() / a.clone();
+        r = b.clone() % a.clone();
 
-        let new_u_a = u_b.clone() - q.clone() * u_a.clone();
-        u_b = u_a;
-        u_a = new_u_a;
+        // second tuple
+        m = x.clone() - u.clone() * q.clone();
+        n = y.clone() - v.clone() * q.clone();
 
-        let new_v_a = v_b.clone() - q.clone() * v_a.clone();
-        v_b = v_a;
-        v_a = new_v_a;
+        // third tuple
+        b = a.clone();
+        a = r.clone();
+        x = u.clone();
+        y = v.clone();
+        u = m.clone();
+        v = n.clone();
     }
-    (bb, u_b, v_b)
+    let gcd = b;
+    return (gcd.clone(), x, y)
 }
 
+// usually E, Phi_n
 pub fn modinv(a: &BigUint, b: &BigUint) -> BigUint {
     let (g, x, _) = egcd(&a, &b);
-    println!("G: {}, X: {}", g, x);
-    let (g, x) = (g, x);
+    let b = b.to_bigint().expect("Conversion failed");
+    println!("X % B: {}", (x.clone().modulus(b.clone())));
     if g == One::one() {
-        return x.to_biguint().unwrap() % b;
+        return (x.modulus(b)).to_biguint().expect("Result was negative");
     } else {
         panic!("Recursion in Modular Inverse Failed!");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_find_modinv() {
+        let inv = modinv(&BigUint::from(23usize), &BigUint::from(3usize));
+        println!("Inv: {}", inv);
+        let inv = modinv(&BigUint::from(19usize), &BigUint::from(7usize));
+        println!("Inv: {}", inv);
+        let inv = modinv(&BigUint::from(3083usize), &BigUint::from(487usize));
+        println!("Inv: {}", inv);
+        let inv = modinv(&BigUint::from(3361usize), &BigUint::from(211usize));
+        println!("Inv: {}", inv);
+    }
+
+    #[test]
+    fn should_find_egcd() {
+        let (g, x, y) = egcd(&BigUint::from(7usize), &BigUint::from(19usize));
+        println!("G: {}, X: {}, Y: {}", g, x, y);
     }
 }

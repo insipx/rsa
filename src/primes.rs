@@ -94,8 +94,10 @@ mod tests {
     fn should_find_large_prime() {
         let prime = PrimeFinder::find(&KeySize::FiveTwelve).unwrap();
         println!("Prime Number Found: {:?}", prime);
+        /*
         let prime = PrimeFinder::find(&KeySize::TwentyFourtyEight).unwrap();
         println!("Prime Number Found: {:?}", prime);
+        */
     }
 
     /*

@@ -4,10 +4,9 @@ use crate::simpledb::SimpleDB;
 use crate::math;
 use crate::err::ErrorKind;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::cell::RefCell;
 use num_bigint::BigUint;
-use num_traits::identities::{One, Zero};
+use num_traits::{One, Zero};
 use serde::{Serialize, Deserialize};
 use failure::Error;
 
