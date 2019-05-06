@@ -120,7 +120,7 @@ impl AlgoRSA {
         }
         let n = p.clone() * q.clone();
         let phi_n = prime_phi(&p, &q);
-        let d = math::modinv(&e, &phi_n);
+        let d = math::modinv(&e, &phi_n)?;
 
         return Ok(RSA { p, q, e, d, n})
     }

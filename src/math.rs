@@ -2,8 +2,12 @@
 //! NOTE: Fermat and Rabin-Miller used for Primality testing may be found implementede within the 'ProbableVariant' enum inside primes/gen.rs
 //! These functions are not exposed as public-api because their use is strictly for generating large prime numbers
 //! These are generally helper functions
+use crate::err::ErrorKind;
+
 use num_bigint::{BigUint, BigInt, ToBigInt, ToBigUint};
 use num_traits::{One, Zero};
+use num_integer::Integer;
+use failure::Error;
 
 
 pub trait Mod<B = Self> {
@@ -16,7 +20,7 @@ impl Mod for BigUint {
     type Output = BigUint;
 
     fn modulus(self, rhs: BigUint) -> BigUint {
-        (self.clone() % rhs.clone()) + rhs.clone()
+        ((self.clone() % &rhs) + &rhs) % &rhs
     }
 }
 
@@ -24,31 +28,48 @@ impl Mod for BigInt {
     type Output = BigInt;
 
     fn modulus(self, rhs: BigInt) -> BigInt {
-        (self.clone() % rhs.clone()) + rhs.clone()
+        ((self.clone() % &rhs) + &rhs) % &rhs
     }
 }
+
+impl Mod for &BigUint {
+    type Output = BigUint;
+
+    fn modulus(self, rhs: &BigUint) -> BigUint {
+        ((self.clone() % rhs) + rhs) % rhs
+    }
+}
+
+impl Mod for &BigInt {
+    type Output = BigInt;
+
+    fn modulus(self, rhs: &BigInt) -> BigInt {
+        ((self.clone() % rhs) + rhs) % rhs
+    }
+}
+
+
 
 pub fn prime_phi(p: &BigUint, q: &BigUint) -> BigUint {
     (p - BigUint::one()) * (q - BigUint::one())
 }
 
 
-
 // Euclids Extended GCD
-pub fn egcd(a: &BigUint, b: &BigUint) -> (BigInt, BigInt, BigInt) {
-    let (mut a, mut b) = (a.to_bigint().unwrap(), b.to_bigint().unwrap());
-    let (mut x, mut y, mut u, mut v) = (BigInt::zero(), BigInt::one(), BigInt::one(), BigInt::zero());
+pub fn egcd<I>(a: &I, b: &I) -> (BigInt, BigInt, BigInt) where I: Integer + core::ops::Add + core::ops::Div + core::ops::Sub {
+    let (mut a, mut b) = (a, b);
+    let (mut x, mut y, mut u, mut v) = (Zero::zero(), One::one(), One::one(), Zero::zero());
 
 
-    let (mut q, mut r, mut m, mut n) = (BigInt::zero(), BigInt::zero(), BigInt::zero(), BigInt::zero());
-    while a != BigInt::zero() {
+    let (mut q, mut r, mut m, mut n) = (Zero::zero(), Zero::zero(), Zero::zero(), Zero::zero());
+    while a != Zero::zero() {
         // first tuple
-        q = b.clone() / a.clone();
-        r = b.clone() % a.clone();
+        q = &b / &a;
+        r = &b % &a;
 
         // second tuple
-        m = x.clone() - u.clone() * q.clone();
-        n = y.clone() - v.clone() * q.clone();
+        m = &x - &u * &q;
+        n = &y - &v * &q;
 
         // third tuple
         b = a.clone();
@@ -58,17 +79,15 @@ pub fn egcd(a: &BigUint, b: &BigUint) -> (BigInt, BigInt, BigInt) {
         u = m.clone();
         v = n.clone();
     }
-    let gcd = b;
-    return (gcd.clone(), x, y)
+    return (b.clone(), x, y)
 }
 
+// TODO: figure out a way to avoid using BigInts altogether
 // usually E, Phi_n
-pub fn modinv(a: &BigUint, b: &BigUint) -> BigUint {
+pub fn modinv<I>(a: &I, b: &I) -> Result<BigUint, Error> where I: Integer {
     let (g, x, _) = egcd(&a, &b);
-    let b = b.to_bigint().expect("Conversion failed");
-    println!("X % B: {}", (x.clone().modulus(b.clone())));
     if g == One::one() {
-        return (x.modulus(b)).to_biguint().expect("Result was negative");
+        return Ok((x.modulus(b)).to_biguint().ok_or(ErrorKind::BigNumConversion)?);
     } else {
         panic!("Recursion in Modular Inverse Failed!");
     }
@@ -80,19 +99,17 @@ mod tests {
 
     #[test]
     fn should_find_modinv() {
-        let inv = modinv(&BigUint::from(23usize), &BigUint::from(3usize));
-        println!("Inv: {}", inv);
-        let inv = modinv(&BigUint::from(19usize), &BigUint::from(7usize));
-        println!("Inv: {}", inv);
-        let inv = modinv(&BigUint::from(3083usize), &BigUint::from(487usize));
-        println!("Inv: {}", inv);
-        let inv = modinv(&BigUint::from(3361usize), &BigUint::from(211usize));
-        println!("Inv: {}", inv);
+        assert_eq!(modinv(&BigUint::from(23usize), &BigUint::from(3usize)).unwrap(), 2usize.into());
+        assert_eq!(modinv(&BigUint::from(19usize), &BigUint::from(7usize)).unwrap(), 3usize.into());
+        assert_eq!(modinv(&BigUint::from(3083usize), &BigUint::from(487usize)).unwrap(), 5usize.into());
+        assert_eq!(modinv(&BigUint::from(3361usize), &BigUint::from(211usize)).unwrap(), 14usize.into());
     }
 
     #[test]
     fn should_find_egcd() {
-        let (g, x, y) = egcd(&BigUint::from(7usize), &BigUint::from(19usize));
-        println!("G: {}, X: {}, Y: {}", g, x, y);
+        assert_eq!(egcd(&BigUint::from(23usize), &BigUint::from(3usize)).unwrap(), (1, -1, 8));
+        assert_eq!(egcd(&BigUint::from(19usize), &BigUint::from(7usize)).unwrap(), (1, 3, -8));
+        assert_eq!(egcd(&BigUint::from(3083usize), &BigUint::from(487usize)).unwrap(), (1, 121, -766));
+        assert_eq!(egcd(&BigUint::from(3361usize), &BigUint::from(211usize)).unwrap(), (1, 14, -223));
     }
 }

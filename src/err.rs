@@ -19,7 +19,11 @@ pub enum ErrorKind {
     #[fail(display = "Error when parsing bytes during encryption/decryption")]
     BytesParse,
     #[fail(display = "User not in Database. Have you created a key?")]
-    UserNotFound
+    UserNotFound,
+    #[fail(display = "Conversion between BigInteger types failed")]
+    BigNumConversion,
+    #[fail(display = "Could Not Fetch Database of Small Primes")]
+    DataLoad
 }
 
 
