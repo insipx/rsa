@@ -10,6 +10,6 @@ use cli::App;
 fn main() {
 
     if let Err(e) = App::run() {
-        println!("{}", e);
+        eprintln!("{}", e);
     }
 }

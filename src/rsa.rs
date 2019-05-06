@@ -1,3 +1,3 @@
 mod lib;
 
-pub use lib::{AlgoRSA, RSA};
+pub use lib::{AlgoRSA, RSA, KeyType};

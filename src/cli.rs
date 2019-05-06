@@ -1,6 +1,6 @@
 //! The Front-End
 
-use crate::rsa::{AlgoRSA, RSA};
+use crate::rsa::{AlgoRSA, RSA, KeyType};
 use crate::simpledb::SimpleDB;
 use crate::primes::KeySize;
 use crate::err::ErrorKind;
@@ -35,7 +35,7 @@ pub struct CLI {
     export_private: Option<String>, // user
 
     #[structopt(long = "list-all", short = "l")]
-    list_all: bool,
+    list: bool,
 
     // #[structopt(flatten)]
     //verbosity: Verbosity,
@@ -102,9 +102,29 @@ impl Opts {
 
     pub fn encrypt_dialog(&self) -> Result<(), Error> {
         if let Some(message) = &self.args.encrypt {
-            println!("Who are you encrypting this message to? (Enter the UserNames of Recipients): ");
+            println!("Who are you encrypting this message to? (Enter the User Name of Recipient): ");
             let user = prompt_string()?;
             println!("{}", self.rsa.encrypt(&user, &message)?);
+        }
+
+        Ok(())
+    }
+
+    pub fn export_dialog(&self) -> Result<(), Error> {
+        if let Some(user) = &self.args.export_public {
+            println!("{}", self.rsa.export(user, KeyType::Public)?);
+        }
+
+        if let Some(user) = &self.args.export_private {
+            println!("{}", self.rsa.export(user, KeyType::Private)?);
+        }
+
+        Ok(())
+    }
+
+    pub fn list_dialog(&self) -> Result<(), Error> {
+        if self.args.list {
+            println!("{}", self.rsa.list()?);
         }
 
         Ok(())
@@ -131,8 +151,8 @@ impl App {
         opts.generate_dialog()?;
         opts.encrypt_dialog()?;
         opts.decrypt_dialog()?;
- 
-        println!("\n\nGood Bye!");
+        opts.export_dialog()?;
+        opts.list_dialog()?;
 
         opts.finish()?;
         Ok(())

@@ -43,6 +43,10 @@ impl<D> SimpleDB<D> where D: DeserializeOwned + Serialize + Default {
         })
     }
 
+    pub fn file_path(&self) -> &PathBuf {
+        &self.path
+    }
+
     /// Save structure to a file, serializing to JSON and then compressing with DEFLATE
     pub fn save(&self, data: D) -> Result<(), Error> {
         self.mutate(|file| {

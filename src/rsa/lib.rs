@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use serde::{Serialize, Deserialize};
-use failure::Error;
+use failure::{Error, ResultExt};
 
 pub const E: usize = 65537; // the encryption exponent
 
@@ -21,31 +21,16 @@ pub const E: usize = 65537; // the encryption exponent
  * 6. Bob decrypts by computing m = c^d (mod n)
  */
 
-pub struct KeyGen<'a> {
-    p: &'a BigUint,
-    q: &'a BigUint
-}
-
-impl<'a> KeyGen<'a> {
-
-    pub fn new() -> Self {
-        unimplemented!();
-    }
-
-    // Big Uint used for simplicity purposes
-    fn find_e(p: &'a BigUint, q: &'a BigUint) -> BigUint {
-        unimplemented!();
-    }
-
-    fn find_d(p: &'a BigUint, q: &'a BigUint) -> BigUint {
-        unimplemented!();
-    }
+pub enum KeyType {
+    Public,
+    Private
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RSA {
     d: BigUint,
     n: BigUint,
+    size: KeySize
 }
 
 type PrivateKey = BigUint;
@@ -60,9 +45,11 @@ impl RSA {
     pub fn public(&self) -> &PublicKey {
         &self.n
     }
+
+    pub fn size(&self) -> &KeySize {
+        &self.size
+    }
 }
-
-
 
 pub struct AlgoRSA {
     db: SimpleDB<HashMap<String, RSA>>,
@@ -82,16 +69,16 @@ impl AlgoRSA {
 
     // could extract finding D logic to a different method maybe?
     fn generate(size: &KeySize) -> Result<RSA, Error> {
-        let size = size.as_half();
-        let mut p = PrimeFinder::find(&size)?;
-        let mut q = PrimeFinder::find(&size)?;
+        let multiple_size = size.as_half();
+        let mut p = PrimeFinder::find(&multiple_size)?;
+        let mut q = PrimeFinder::find(&multiple_size)?;
         loop {
             if &p % E == BigUint::zero() {
-                p = PrimeFinder::find(&size)?;
+                p = PrimeFinder::find(&multiple_size)?;
             }
 
             if &q % E == BigUint::zero() {
-                q = PrimeFinder::find(&size)?;
+                q = PrimeFinder::find(&multiple_size)?;
             }
 
             if &p % E != BigUint::zero() && &q % E != BigUint::zero() {
@@ -102,7 +89,7 @@ impl AlgoRSA {
         let phi_n = prime_phi(&p, &q);
         let d = math::modinv(&E.into(), &phi_n)?;
 
-        return Ok(RSA { d, n})
+        return Ok(RSA { d, n, size: size.clone() })
     }
 
     /// Creates a new key and adds it to the Database
@@ -140,19 +127,55 @@ impl AlgoRSA {
         }
     }
 
-    pub fn import(user: String, opts: RSA) -> BigUint {
+    pub fn import(&self, user: &str, opts: RSA) -> BigUint {
         unimplemented!();
     }
 
-    pub fn export(user: String) -> BigUint {
-        unimplemented!();
+    pub fn export(&self, user: &str, key: KeyType) -> Result<String, Error> {
+        if let Some(rsa) = self.map.borrow().get(user) {
+
+            match key {
+                KeyType::Private => {
+                    let key = base64::encode(&rsa.private().to_bytes_be());
+                    let export = format!("======================= BEGIN RSA PRIVATE KEY ========================
+                                         \n {}
+                                         \n======================= END RSA PRIVATE KEY ==========================",
+                                         key);
+                    Ok(textwrap::fill(&export, 70))
+                },
+                KeyType::Public => {
+                    let key = base64::encode(&rsa.public().to_bytes_be());
+                    let export = format!("======================= BEGIN RSA PUBLIC KEY ========================
+                                         \n {}
+                                         \n======================= END RSA PUBLIC KEY ==========================",
+                                         key);
+                    Ok(textwrap::fill(&export, 70))
+                }
+            }
+        } else {
+            Err(ErrorKind::UserNotFound)?
+        }
+    }
+
+    pub fn list(&self) -> Result<String, Error> {
+        let mut list = String::new();
+        list.push_str(&format!("{}\n", self.db.file_path().canonicalize()?.to_str().unwrap()));
+        list.push_str("------------------------------------------\n");
+        for (user, rsa) in self.map.borrow().iter() {
+            list.push_str(&format!("{}: rsa{}/{}\n", user, rsa.size().as_string(), self.public_identifier(user, rsa)));
+        }
+        Ok(list)
+    }
+
+    fn public_identifier(&self, user: &str, rsa: &RSA) -> String {
+        let key = base64::encode(rsa.public().to_bytes_be().as_slice());
+        key[0..16].to_string().to_ascii_uppercase()
     }
 
     // consumes self, saving data to our database.
     // Should be used at the end of the program
     pub fn save_keys(self) -> Result<(), Error> {
         let map = self.map.into_inner();
-        map.iter().for_each(|x| println!("{:?}", x));
         self.db.save(map)?;
         Ok(())
     }
