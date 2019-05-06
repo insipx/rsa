@@ -3,22 +3,25 @@
 
 Created for Cryptography Class
 
+RSA works on both Linux And Windows
+
+I do not own a MAC, so RSA is not tested to compile on MacOSX. However, my assumption is that compilation should work just fine.
 
 ## To Run On Windows
 - Download Windows Binary (Requires 64bit PC): [RSA Windows
-  Binary](https://github.com/insipx/rsa/releases/download/1/Windows.64Bit.exe)
+  Binary](https://github.com/insipx/rsa/releases/download/1/RSA.Windows.64Bit.exe)
 - place the binary in any folder you like
 - navigate to the folder you placed the binary in with PowerShell
 - Run RSA! `./rsa --help`
 
 ## To Run on Linux
 - Download the Linux Binary (Requires 64bit PC): [RSA
-  Linux](https://github.com/insipx/rsa/releases/download/1/GNU.Linux.64bit)
+  Linux](https://github.com/insipx/rsa/releases/download/1/RSA.GNU.Linux.64bit)
 - place linux binary in a directory specified in PATH or just a directory you want to execute from
 - `./rsa --help` while in same directory
 
 ## To Compile on Windows
-- install Rust: [https://rustup.rs](https://rustup.rs)
+- install Rust (If not already installed): [https://rustup.rs](https://rustup.rs)
 - Must have VS installed with Visual C++ options
 - `git clone` the repository or download and unzip this repository into any directory
 - Navigate your way into the root directory of the downloaded repository
