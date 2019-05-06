@@ -27,7 +27,10 @@ pub enum ErrorKind {
     #[fail(display = "Failed to Parse Input. Number must be greater than 0")]
     WrongNumber,
     #[fail(display = "Failed to parse input")]
-    CouldNotParse
+    CouldNotParse,
+    #[fail(display = "Could not decode base64 input")]
+    CouldNotDecode
+
 }
 
 
