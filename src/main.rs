@@ -6,9 +6,10 @@ mod math;
 mod cli;
 
 use cli::App;
-use failure::Error;
 
-fn main() -> Result<(), Error> {
-    App::run()?;
-    Ok(())
+fn main() {
+
+    if let Err(e) = App::run() {
+        println!("{}", e);
+    }
 }

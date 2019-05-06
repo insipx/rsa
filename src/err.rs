@@ -23,7 +23,11 @@ pub enum ErrorKind {
     #[fail(display = "Conversion between BigInteger types failed")]
     BigNumConversion,
     #[fail(display = "Could Not Fetch Database of Small Primes")]
-    DataLoad
+    DataLoad,
+    #[fail(display = "Failed to Parse Input. Number must be greater than 0")]
+    WrongNumber,
+    #[fail(display = "Failed to parse input")]
+    CouldNotParse
 }
 
 

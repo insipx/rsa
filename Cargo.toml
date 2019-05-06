@@ -17,6 +17,7 @@ structopt = "0.2.15"
 base64 = "0.10.1"
 num-traits = "0.2"
 num-integer = "0.1.39"
+termcolor = "1.0.4"
 
 [dependencies.num-bigint]
 version = "0.2"

@@ -25,11 +25,14 @@ pub struct SimpleDB<D: DeserializeOwned + Serialize + Default> {
     path: PathBuf,
     _marker: PhantomData<D>,
 }
+
 // TODO: Figure out a way to use MessagePack instead of JSON
 // JSON is OK because we compress it
 // compression bench: of ETH tipjar addr txs, block 0-6mil - uncompressed 100MB, compressed 3.9MB
 /// A simple DB that allows saving/retrieving structures to/from a (compressed) file,
 impl<D> SimpleDB<D> where D: DeserializeOwned + Serialize + Default {
+
+
     pub fn new(path: PathBuf) -> Result<Self, Error> {
         if !path.as_path().exists() {
             File::create(path.as_path()).context(ErrorKind::Database)?;

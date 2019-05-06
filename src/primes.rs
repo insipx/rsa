@@ -44,22 +44,20 @@ impl KeySize {
             _ => panic!("Invalid Key Size. Minimum Key Size is 512 bits"),
         }
     }
-}
 
-impl From<usize> for KeySize {
-    fn from(size: usize) -> KeySize {
+    pub fn from_input(size: &usize) -> Result<Self, Error> {
 
-        match size {
+        Ok(match *size {
             512  => KeySize::FiveTwelve,
             1024 => KeySize::TenTwentyFour,
             2048 => KeySize::TwentyFourtyEight,
             4096 => KeySize::FourtyNinetySix,
             8192 => KeySize::EightyOneNinetyTwo,
-            _ => panic!("KeySize is too small or too large. Minimum Size: 512, Max Size: 8192")
-        }
-
+            _ => Err(ErrorKind::InvalidKeyLength)?
+        })
     }
 }
+
 
 impl Default for KeySize {
     fn default() -> KeySize {

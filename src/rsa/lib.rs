@@ -10,7 +10,7 @@ use num_traits::{One, Zero};
 use serde::{Serialize, Deserialize};
 use failure::Error;
 
-pub const BASE: u32 = 16;
+pub const E: usize = 65537; // the encryption exponent
 
 /*
  * 1. Bob Chooses Secret primes p and q and computes n = pq
@@ -42,40 +42,23 @@ impl<'a> KeyGen<'a> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct RSA {
-    p: BigUint,
-    q: BigUint,
     d: BigUint,
     n: BigUint,
-    e: BigUint,
 }
 
-pub struct PrivateKey {
-    p: BigUint,
-    q: BigUint,
-    d: BigUint
-}
-
-pub struct PublicKey {
-    n: BigUint,
-    e: BigUint
-}
+type PrivateKey = BigUint;
+type PublicKey = BigUint;
 
 impl RSA {
-    pub fn private(&self) -> PrivateKey {
-        return PrivateKey {
-            p: self.p.clone(),
-            q: self.q.clone(),
-            d: self.d.clone()
-        };
+
+    pub fn private(&self) -> &PrivateKey {
+        &self.d
     }
 
-    pub fn public(&self) -> PublicKey {
-        return PublicKey {
-            n: self.n.clone(),
-            e: self.e.clone()
-        }
+    pub fn public(&self) -> &PublicKey {
+        &self.n
     }
 }
 
@@ -97,32 +80,29 @@ impl AlgoRSA {
         })
     }
 
-    // uses a static e at size 65537
-    // TODO: Try to remove as many clones as possible. This is fairly ridiculous tbh
     // could extract finding D logic to a different method maybe?
     fn generate(size: &KeySize) -> Result<RSA, Error> {
-        let e = BigUint::from(65537usize);
         let size = size.as_half();
         let mut p = PrimeFinder::find(&size)?;
         let mut q = PrimeFinder::find(&size)?;
         loop {
-            if p.clone() % e.clone() == BigUint::zero() {
+            if &p % E == BigUint::zero() {
                 p = PrimeFinder::find(&size)?;
             }
 
-            if q.clone() % e.clone() == BigUint::zero() {
+            if &q % E == BigUint::zero() {
                 q = PrimeFinder::find(&size)?;
             }
 
-            if p.clone() % e.clone() != BigUint::zero() && q.clone() % e.clone() != BigUint::zero() {
+            if &p % E != BigUint::zero() && &q % E != BigUint::zero() {
                 break;
             }
         }
-        let n = p.clone() * q.clone();
+        let n = &p * &q;
         let phi_n = prime_phi(&p, &q);
-        let d = math::modinv(&e, &phi_n)?;
+        let d = math::modinv(&E.into(), &phi_n)?;
 
-        return Ok(RSA { p, q, e, d, n})
+        return Ok(RSA { d, n})
     }
 
     /// Creates a new key and adds it to the Database
@@ -141,8 +121,8 @@ impl AlgoRSA {
         // TODO: Make this error better
         if let Some(rsa) = self.map.borrow().get(user) {
             let bytes = message.as_bytes();
-            let num = BigUint::parse_bytes(bytes, BASE).ok_or(ErrorKind::BytesParse)?;
-            let encrypted = num.modpow(&rsa.e, &rsa.n);
+            let num = BigUint::from_bytes_be(bytes);
+            let encrypted = num.modpow(&E.into(), &rsa.n);
             Ok(base64::encode(encrypted.to_bytes_be().as_slice()))
         } else {
             return Err(ErrorKind::UserNotFound)?;
@@ -172,6 +152,7 @@ impl AlgoRSA {
     // Should be used at the end of the program
     pub fn save_keys(self) -> Result<(), Error> {
         let map = self.map.into_inner();
+        map.iter().for_each(|x| println!("{:?}", x));
         self.db.save(map)?;
         Ok(())
     }

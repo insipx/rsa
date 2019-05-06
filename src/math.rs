@@ -56,22 +56,18 @@ pub fn prime_phi(p: &BigUint, q: &BigUint) -> BigUint {
 
 
 // Euclids Extended GCD
-pub fn egcd<I>(a: &I, b: &I) -> (BigInt, BigInt, BigInt) where I: Integer + core::ops::Add + core::ops::Div + core::ops::Sub {
-    let (mut a, mut b) = (a, b);
-    let (mut x, mut y, mut u, mut v) = (Zero::zero(), One::one(), One::one(), Zero::zero());
+pub fn egcd(a: &BigUint, b: &BigUint) -> Result<(BigInt, BigInt, BigInt), Error> {
+    let (mut a, mut b) = (a.to_bigint().ok_or(ErrorKind::BigNumConversion)?, b.to_bigint().ok_or(ErrorKind::BigNumConversion)?);
+    let (mut x, mut y, mut u, mut v) = (BigInt::zero(), BigInt::one(), BigInt::one(), BigInt::zero());
 
-
-    let (mut q, mut r, mut m, mut n) = (Zero::zero(), Zero::zero(), Zero::zero(), Zero::zero());
+    let (mut q, mut r, mut m, mut n) = (BigInt::zero(), BigInt::zero(), BigInt::zero(), BigInt::zero());
     while a != Zero::zero() {
-        // first tuple
         q = &b / &a;
         r = &b % &a;
 
-        // second tuple
         m = &x - &u * &q;
         n = &y - &v * &q;
 
-        // third tuple
         b = a.clone();
         a = r.clone();
         x = u.clone();
@@ -79,17 +75,19 @@ pub fn egcd<I>(a: &I, b: &I) -> (BigInt, BigInt, BigInt) where I: Integer + core
         u = m.clone();
         v = n.clone();
     }
-    return (b.clone(), x, y)
+    return Ok((b.clone(), x, y))
 }
 
 // TODO: figure out a way to avoid using BigInts altogether
 // usually E, Phi_n
-pub fn modinv<I>(a: &I, b: &I) -> Result<BigUint, Error> where I: Integer {
-    let (g, x, _) = egcd(&a, &b);
-    if g == One::one() {
+pub fn modinv(a: &BigUint, b: &BigUint) -> Result<BigUint, Error> {
+    let (g, x, _) = egcd(&a, &b)?;
+    let b = b.to_bigint().ok_or(ErrorKind::BigNumConversion)?;
+    if g == BigInt::one() {
         return Ok((x.modulus(b)).to_biguint().ok_or(ErrorKind::BigNumConversion)?);
     } else {
-        panic!("Recursion in Modular Inverse Failed!");
+        // This will never (hopefully, EVER) happen since p and q are real primes and the gcd phi_n is always 1. Q.E.D
+        panic!("P or Q are not real primes such that gcd(e, phi(n)) == 1. Aborting Execution.");
     }
 }
 
@@ -101,15 +99,15 @@ mod tests {
     fn should_find_modinv() {
         assert_eq!(modinv(&BigUint::from(23usize), &BigUint::from(3usize)).unwrap(), 2usize.into());
         assert_eq!(modinv(&BigUint::from(19usize), &BigUint::from(7usize)).unwrap(), 3usize.into());
-        assert_eq!(modinv(&BigUint::from(3083usize), &BigUint::from(487usize)).unwrap(), 5usize.into());
+        assert_eq!(modinv(&BigUint::from(3083usize), &BigUint::from(487usize)).unwrap(), 121usize.into());
         assert_eq!(modinv(&BigUint::from(3361usize), &BigUint::from(211usize)).unwrap(), 14usize.into());
     }
 
     #[test]
     fn should_find_egcd() {
-        assert_eq!(egcd(&BigUint::from(23usize), &BigUint::from(3usize)).unwrap(), (1, -1, 8));
-        assert_eq!(egcd(&BigUint::from(19usize), &BigUint::from(7usize)).unwrap(), (1, 3, -8));
-        assert_eq!(egcd(&BigUint::from(3083usize), &BigUint::from(487usize)).unwrap(), (1, 121, -766));
-        assert_eq!(egcd(&BigUint::from(3361usize), &BigUint::from(211usize)).unwrap(), (1, 14, -223));
+        assert_eq!(egcd(&BigUint::from(23usize), &BigUint::from(3usize)).unwrap(), (BigInt::from(1), BigInt::from(-1), BigInt::from(8)));
+        assert_eq!(egcd(&BigUint::from(19usize), &BigUint::from(7usize)).unwrap(), (1.into(), 3.into(), BigInt::from(-8)));
+        assert_eq!(egcd(&BigUint::from(3083usize), &BigUint::from(487usize)).unwrap(), (1.into(), 121.into(), BigInt::from(-766)));
+        assert_eq!(egcd(&BigUint::from(3361usize), &BigUint::from(211usize)).unwrap(), (1.into(), 14.into(), BigInt::from(-223)));
     }
 }
