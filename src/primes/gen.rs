@@ -167,7 +167,6 @@ impl ProbableVariant {
 mod tests {
     use super::*;
     use num_bigint::ToBigUint;
-/*
     #[test]
     fn should_generate_random_numbers() {
         let gen = NumberGenerator::new(&KeySize::FiveTwelve).unwrap();
@@ -216,5 +215,4 @@ mod tests {
         let num = 1848usize.to_biguint().unwrap();
         assert!(ProbableVariant::find(&num) == ProbableVariant::Composite);
     }
-*/
 }
