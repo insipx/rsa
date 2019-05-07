@@ -4,15 +4,19 @@ use crate::rsa::{AlgoRSA, RSA, KeyType};
 use crate::simpledb::SimpleDB;
 use crate::primes::KeySize;
 use crate::err::ErrorKind;
+use num_bigint::BigUint;
 use std::path::PathBuf;
 use std::collections::HashMap;
-// use quicli::prelude::*;
 use structopt::StructOpt;
+use structopt::clap::AppSettings;
+use regex::Regex;
 use failure::{ResultExt, Error};
 
 
+// TODO: Make strings that are supposed to be files, files
+
 #[derive(Debug, StructOpt)]
-#[structopt(name = "rsa", about = "A simple RSA command-line application")]
+#[structopt(raw(global_setting = "AppSettings::AllowLeadingHyphen"))]
 pub struct CLI {
     #[structopt(long = "db")]
     /// Specify the database that the private/public keys will be stored. Required
@@ -34,10 +38,6 @@ pub struct CLI {
     /// Decrypt data
     decrypt: Option<String>,
 
-    #[structopt(long = "decrypt-to")]
-    /// Specify a file to decrypt data to
-    decrypt_to: Option<String>,
-
     #[structopt(long = "generate", short = "g")]
     /// Generate a new key
     generate: bool,
@@ -53,6 +53,14 @@ pub struct CLI {
     #[structopt(long = "export-private")]
     /// Export a private key
     export_private: bool, // user
+
+    #[structopt(long = "import-public")]
+    /// import a public key
+    import_public: Option<String>, // data
+
+    #[structopt(long = "import-private")]
+    /// import a private key (must have imported a public key first)
+    import_private: Option<String>,
 
     #[structopt(long = "list-all", short = "l")]
     /// List all key-pairs present in the database
@@ -80,6 +88,16 @@ pub struct Opts {
     rsa: AlgoRSA
 }
 
+// Take from format --- BEGIN ---- {content} ---- END --- to just content
+fn parse_rsa_format(input: &str) -> Result<String, Error> {
+    //  do some basic input sanitization first, in case the user/OS entered some newlines in the file
+    //  actually modifying the base64 in any way would lead to total failure, however
+    let re_replace = Regex::new(r"[\t\n]*")?;
+    let input = re_replace.replace_all(input, "");
+    let re_base64 = Regex::new(r"-+[ A-Z]+-+([A-Za-z0-9+/=]+)")?;
+    let base64_cap = re_base64.captures(&input).ok_or(ErrorKind::RegexParse)?;
+    Ok(base64_cap.get(1).ok_or(ErrorKind::RegexParse)?.as_str().into())
+}
 
 impl Opts {
     pub fn parse() -> Result<Self, Error> {
@@ -114,7 +132,7 @@ impl Opts {
     pub fn decrypt_dialog(&self) -> Result<(), Error> {
         if let Some(message) = &self.args.decrypt {
             let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
-
+            let message = parse_rsa_format(&message)?;
             println!("{}", self.rsa.decrypt(&user, &message)?);
         }
 
@@ -157,6 +175,23 @@ impl Opts {
         Ok(())
     }
 
+    pub fn import_dialog(&self) -> Result<(), Error> {
+        let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
+        if self.args.import_public.is_some() {
+            let pubkey = base64::decode(&parse_rsa_format(&self.args.import_public.as_ref().expect("Within checked scope; Q.E.D"))?)?;
+            let size = KeySize::from_input(&(pubkey.len() * 8))?;
+            let pubkey = BigUint::from_bytes_be(&pubkey);
+            let rsa = RSA::new(pubkey, None, size);
+            self.rsa.import(user, rsa);
+        }
+
+        if self.args.import_private.is_some() {
+            let privkey = base64::decode(&parse_rsa_format(&self.args.import_private.as_ref().expect("Within checked scope; Q.E.D"))?)?;
+            self.rsa.import_private(user, &BigUint::from_bytes_be(&privkey))?;
+        }
+        Ok(())
+    }
+
     pub fn list_dialog(&self) -> Result<(), Error> {
         if self.args.list {
             println!("{}", self.rsa.list()?);
@@ -184,8 +219,31 @@ impl App {
         opts.decrypt_dialog()?;
         opts.export_dialog()?;
         opts.list_dialog()?;
-
+        opts.import_dialog()?;
         opts.finish()?;
         Ok(())
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_return_parsed_rsa_format() {
+        let test_str = "
+
+
+\t\t\n------------------ BEGIN  RSA PUBLIC   KEY ---------------\t\n-- --
+
+
+\t
+Onlythisshouldremain
+\n
+
+------------------ END RSA PUBLIC KEY ---------------------";
+        parse_rsa_format(&test_str).unwrap();
+
     }
 }

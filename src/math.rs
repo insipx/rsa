@@ -4,9 +4,8 @@
 //! These are generally helper functions
 use crate::err::ErrorKind;
 
-use num_bigint::{BigUint, BigInt, ToBigInt, ToBigUint};
+use num_bigint::{BigUint, BigInt, ToBigInt};
 use num_traits::{One, Zero};
-use num_integer::Integer;
 use failure::Error;
 
 
@@ -49,18 +48,17 @@ impl Mod for &BigInt {
 }
 
 
-
+/// Take the phi of n which are two prime numbers
 pub fn prime_phi(p: &BigUint, q: &BigUint) -> BigUint {
     (p - BigUint::one()) * (q - BigUint::one())
 }
-
 
 // Euclids Extended GCD
 pub fn egcd(a: &BigUint, b: &BigUint) -> Result<(BigInt, BigInt, BigInt), Error> {
     let (mut a, mut b) = (a.to_bigint().ok_or(ErrorKind::BigNumConversion)?, b.to_bigint().ok_or(ErrorKind::BigNumConversion)?);
     let (mut x, mut y, mut u, mut v) = (BigInt::zero(), BigInt::one(), BigInt::one(), BigInt::zero());
 
-    let (mut q, mut r, mut m, mut n) = (BigInt::zero(), BigInt::zero(), BigInt::zero(), BigInt::zero());
+    let (mut q, mut r, mut m, mut n);
     while a != Zero::zero() {
         q = &b / &a;
         r = &b % &a;

@@ -6,9 +6,9 @@ use crate::err::ErrorKind;
 use std::collections::HashMap;
 use std::cell::RefCell;
 use num_bigint::BigUint;
-use num_traits::{One, Zero};
+use num_traits::{Zero};
 use serde::{Serialize, Deserialize};
-use failure::{Error, ResultExt};
+use failure::{Error};
 
 pub const E: usize = 65537; // the encryption exponent
 
@@ -28,8 +28,8 @@ pub enum KeyType {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RSA {
-    d: BigUint,
     n: BigUint,
+    d: Option<BigUint>,
     size: KeySize
 }
 
@@ -37,9 +37,16 @@ type PrivateKey = BigUint;
 type PublicKey = BigUint;
 
 impl RSA {
+    pub fn new(n: BigUint, d: Option<BigUint>, size: KeySize) -> Self {
+        RSA { n,d,size }
+    }
 
-    pub fn private(&self) -> &PrivateKey {
-        &self.d
+    pub fn private_exists(&self) -> bool {
+        self.d.is_some()
+    }
+
+    pub fn private(&self) -> Result<&PrivateKey, Error> {
+        Ok(self.d.as_ref().ok_or(ErrorKind::PrivateKeyNotFound)?)
     }
 
     pub fn public(&self) -> &PublicKey {
@@ -86,10 +93,10 @@ impl AlgoRSA {
             }
         }
         let n = &p * &q;
-        let phi_n = prime_phi(&p, &q);
+        let phi_n = math::prime_phi(&p, &q);
         let d = math::modinv(&E.into(), &phi_n)?;
 
-        return Ok(RSA { d, n, size: size.clone() })
+        return Ok(RSA { d: Some(d), n, size: size.clone() })
     }
 
     /// Creates a new key and adds it to the Database
@@ -103,61 +110,69 @@ impl AlgoRSA {
     //
     // Returns a Base64-encoded string that is the encrypted message
     // User here is the user the message is being encrypted for
-    // TODO: Create separate ASCII-armor methods
+    // TODO: accept a message *as bytes* allowing for anything to be encrypted
     pub fn encrypt(&self, user: &String, message: &String) -> Result<String, Error> {
         // TODO: Make this error better
         if let Some(rsa) = self.map.borrow().get(user) {
             let bytes = message.as_bytes();
             let num = BigUint::from_bytes_be(bytes);
-            let encrypted = num.modpow(&E.into(), &rsa.n);
+            let encrypted = num.modpow(&E.into(), rsa.public());
             Ok(base64::encode(encrypted.to_bytes_be().as_slice()))
         } else {
             return Err(ErrorKind::UserNotFound)?;
         }
     }
 
+    //TODO: return bytes instead of a string
     pub fn decrypt(&self, user: &String, message: &String) -> Result<String, Error> {
         if let Some(rsa) = self.map.borrow().get(user) {
             let message = base64::decode(&message)?;
             let encrypted = BigUint::from_bytes_be(&message.as_slice());
-            let decrypted = encrypted.modpow(&rsa.d, &rsa.n);
+            let decrypted = encrypted.modpow(rsa.private()?, rsa.public());
             Ok(String::from_utf8(decrypted.to_bytes_be())?)
         } else {
             return Err(ErrorKind::UserNotFound)?;
         }
     }
 
-    pub fn import(&self, user: &str, opts: RSA) -> BigUint {
-        unimplemented!();
+    pub fn import(&self, user: &str, opts: RSA) {
+        // if user already exists in DB, we might only want to add the private key
+        if opts.private_exists() {
+            if let Some(rsa) = self.map.borrow_mut().get_mut(user) { // if the user already exists in the DB
+                (*rsa).d = opts.d;
+                (*rsa).n = opts.n;
+                (*rsa).size = opts.size;
+            }
+        } else {
+            self.map.borrow_mut().insert(user.to_string(), opts);
+        }
+    }
+
+    pub fn import_private(&self, user: &str, private_key: &BigUint) -> Result<(), Error> {
+        if self.map.borrow().contains_key(user) {
+            if let Some(rsa) = self.map.borrow_mut().get_mut(user) {
+                (*rsa).d = Some(private_key.to_owned());
+            }
+        } else {
+            Err(ErrorKind::ImportOrder)?
+        }
+        Ok(())
     }
 
     pub fn export(&self, user: &str, key: KeyType) -> Result<String, Error> {
         if let Some(rsa) = self.map.borrow().get(user) {
-
             match key {
-                KeyType::Private => {
-                    let key = base64::encode(&rsa.private().to_bytes_be());
-                    /*let export = format!("======================= BEGIN RSA PRIVATE KEY ========================
-                                         \n {}
-                                         \n======================= END RSA PRIVATE KEY ==========================",
-                                         key);
-                    */
-                    // Ok(textwrap::fill(&export, 70))
-                    Ok(key)
-                },
-                KeyType::Public => {
-                    let key = base64::encode(&rsa.public().to_bytes_be());
-                    // let export = format!("======================= BEGIN RSA PUBLIC KEY ========================
-                                         // \n {}
-                                         // \n======================= END RSA PUBLIC KEY ==========================",
-                                         // key);
-                    // Ok(textwrap::fill(&export, 70))
-                    Ok(key)
-                }
+                KeyType::Private => Ok(base64::encode(&rsa.private()?.to_bytes_be())),
+                KeyType::Public => Ok(base64::encode(&rsa.public().to_bytes_be()))
             }
         } else {
             Err(ErrorKind::UserNotFound)?
         }
+    }
+
+    // if the user exists, the private key must exist
+    pub fn user_exists(&self, user: &str) -> bool {
+        self.map.borrow().contains_key(user)
     }
 
     pub fn list(&self) -> Result<String, Error> {
@@ -165,12 +180,12 @@ impl AlgoRSA {
         list.push_str(&format!("{}\n", self.db.file_path().canonicalize()?.to_str().unwrap()));
         list.push_str("------------------------------------------\n");
         for (user, rsa) in self.map.borrow().iter() {
-            list.push_str(&format!("{}: rsa{}/{}\n", user, rsa.size().as_string(), self.public_identifier(user, rsa)));
+            list.push_str(&format!("{}: rsa{}/{}\n", user, rsa.size().as_string(), self.public_identifier(rsa)));
         }
         Ok(list)
     }
 
-    fn public_identifier(&self, user: &str, rsa: &RSA) -> String {
+    fn public_identifier(&self, rsa: &RSA) -> String {
         let key = base64::encode(rsa.public().to_bytes_be().as_slice());
         key[0..16].to_string().to_ascii_uppercase()
     }
@@ -182,8 +197,4 @@ impl AlgoRSA {
         self.db.save(map)?;
         Ok(())
     }
-}
-
-fn prime_phi(p: &BigUint, q: &BigUint) -> BigUint {
-    (p - BigUint::one()) * (q - BigUint::one())
 }
