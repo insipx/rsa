@@ -29,8 +29,9 @@ pub enum ErrorKind {
     #[fail(display = "Failed to parse input")]
     CouldNotParse,
     #[fail(display = "Could not decode base64 input")]
-    CouldNotDecode
-
+    CouldNotDecode,
+    #[fail(display = "Must specify a user")]
+    NoUserSpecified
 }
 
 

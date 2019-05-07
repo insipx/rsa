@@ -6,35 +6,56 @@ use crate::primes::KeySize;
 use crate::err::ErrorKind;
 use std::path::PathBuf;
 use std::collections::HashMap;
-use quicli::prelude::*;
+// use quicli::prelude::*;
 use structopt::StructOpt;
 use failure::{ResultExt, Error};
 
 
 #[derive(Debug, StructOpt)]
+#[structopt(name = "rsa", about = "A simple RSA command-line application")]
 pub struct CLI {
     #[structopt(long = "db")]
+    /// Specify the database that the private/public keys will be stored. Required
     database: String,
 
+    #[structopt(long = "user", short = "u")]
+    /// Specify the user for user-specific actions like encrypting, decrypting, and exporting
+    user: Option<String>,
+
     #[structopt(long = "encrypt", short = "e")]
+    /// Encrypt. Requires a String argument that is the data to encrypt
     encrypt: Option<String>,
 
+    #[structopt(long = "encrypt-file")]
+    // Specify a file to encrypt. File may include anything
+    encrypt_file: Option<String>,
+
     #[structopt(long = "decrypt", short = "d")]
+    /// Decrypt data
     decrypt: Option<String>,
 
+    #[structopt(long = "decrypt-to")]
+    /// Specify a file to decrypt data to
+    decrypt_to: Option<String>,
+
     #[structopt(long = "generate", short = "g")]
+    /// Generate a new key
     generate: bool,
 
     #[structopt(long = "import", short = "i")]
+    /// Import a key
     import: Option<String>, // file
 
     #[structopt(long = "export-public")]
-    export_public: Option<String>, // user
+    /// Export a public key
+    export_public: bool, // user
 
     #[structopt(long = "export-private")]
-    export_private: Option<String>, // user
+    /// Export a private key
+    export_private: bool, // user
 
     #[structopt(long = "list-all", short = "l")]
+    /// List all key-pairs present in the database
     list: bool,
 
     // #[structopt(flatten)]
@@ -81,6 +102,7 @@ impl Opts {
             let key_size = KeySize::from_input(&prompt_number()?)?;
 
             println!("Hold On, Generating Key of size {} and committing to the Database", key_size.as_num());
+            // TODO: Start in separate thread
             self.rsa.create(&user, &key_size)?;
 
             println!("User {} with public/private keys added to database!", user);
@@ -91,8 +113,7 @@ impl Opts {
 
     pub fn decrypt_dialog(&self) -> Result<(), Error> {
         if let Some(message) = &self.args.decrypt {
-            println!("Who are you?");
-            let user = prompt_string()?;
+            let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
 
             println!("{}", self.rsa.decrypt(&user, &message)?);
         }
@@ -102,21 +123,35 @@ impl Opts {
 
     pub fn encrypt_dialog(&self) -> Result<(), Error> {
         if let Some(message) = &self.args.encrypt {
-            println!("Who are you encrypting this message to? (Enter the User Name of Recipient): ");
-            let user = prompt_string()?;
-            println!("{}", self.rsa.encrypt(&user, &message)?);
+            let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
+            let encrypted = self.rsa.encrypt(&user, &message)?;
+            println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
+            println!("{}", textwrap::fill(&encrypted, 70));
+            println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
         }
 
         Ok(())
     }
 
     pub fn export_dialog(&self) -> Result<(), Error> {
-        if let Some(user) = &self.args.export_public {
-            println!("{}", self.rsa.export(user, KeyType::Public)?);
+        if self.args.export_public {
+            let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
+            let key = self.rsa.export(&user, KeyType::Public)?;
+            let export = format!("----------------------- BEGIN RSA PUBLIC KEY ------------------------
+                                 \n {}
+                                 \n----------------------- END RSA PUBLIC KEY --------------------------",
+                                 textwrap::fill(&key, 70));
+            println!("{}", export);
         }
 
-        if let Some(user) = &self.args.export_private {
-            println!("{}", self.rsa.export(user, KeyType::Private)?);
+        if self.args.export_private {
+            let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
+            let key = self.rsa.export(&user, KeyType::Private)?;
+            let export = format!("----------------------- BEGIN RSA PRIVATE KEY ------------------------
+                                 \n {}
+                                 \n----------------------- END RSA PRIVATE KEY --------------------------",
+                                 textwrap::fill(&key, 70));
+            println!("{}", export);
         }
 
         Ok(())
@@ -136,14 +171,10 @@ impl Opts {
     }
 }
 
-pub struct App {
-    opts: Opts
-}
+pub struct App;
 
 impl App {
-    pub fn new(opts: Opts) -> Self {
-        App { opts }
-    }
+
 
     pub fn run() -> Result<(), Error> {
         let opts = Opts::parse()?;

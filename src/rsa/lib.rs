@@ -137,19 +137,22 @@ impl AlgoRSA {
             match key {
                 KeyType::Private => {
                     let key = base64::encode(&rsa.private().to_bytes_be());
-                    let export = format!("======================= BEGIN RSA PRIVATE KEY ========================
+                    /*let export = format!("======================= BEGIN RSA PRIVATE KEY ========================
                                          \n {}
                                          \n======================= END RSA PRIVATE KEY ==========================",
                                          key);
-                    Ok(textwrap::fill(&export, 70))
+                    */
+                    // Ok(textwrap::fill(&export, 70))
+                    Ok(key)
                 },
                 KeyType::Public => {
                     let key = base64::encode(&rsa.public().to_bytes_be());
-                    let export = format!("======================= BEGIN RSA PUBLIC KEY ========================
-                                         \n {}
-                                         \n======================= END RSA PUBLIC KEY ==========================",
-                                         key);
-                    Ok(textwrap::fill(&export, 70))
+                    // let export = format!("======================= BEGIN RSA PUBLIC KEY ========================
+                                         // \n {}
+                                         // \n======================= END RSA PUBLIC KEY ==========================",
+                                         // key);
+                    // Ok(textwrap::fill(&export, 70))
+                    Ok(key)
                 }
             }
         } else {
