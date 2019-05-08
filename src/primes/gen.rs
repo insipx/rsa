@@ -103,8 +103,6 @@ impl ProbableVariant {
         ProbableVariant::Prime
     }
 
-    /// If this function returns false, then the candidate is composite
-    /// If this function returns true, then the candidate is probably not composite
     pub fn fermat(candidate: &BigUint) -> Self {
         let mut rng = rand::thread_rng();
         let a = rng.gen_biguint_range(&BigUint::one(), &(candidate - BigUint::one()));
@@ -117,7 +115,6 @@ impl ProbableVariant {
     }
 
     /// The Candidate prime number and how many rounds (k) to process or miller-rabin
-    /// References: https://stackoverflow.com/questions/6325576/how-many-iterations-of-rabin-miller-should-i-use-for-cryptographic-safe-primes
     /// (How many rounds of miller rabin to use)
     pub fn rabin_miller(candidate: &BigUint, rounds: usize) -> Self {
 
