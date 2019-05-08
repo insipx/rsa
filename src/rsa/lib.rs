@@ -112,19 +112,16 @@ impl AlgoRSA {
     // User here is the user the message is being encrypted for
     // TODO: accept a message *as bytes* allowing for anything to be encrypted
     pub fn encrypt(&self, user: &String, data: &[u8]) -> Result<String, Error> {
-        // TODO: Make this error better
+        // TODO: change so base64 is only used once
         if let Some(rsa) = self.map.borrow().get(user) {
-            let mut encrypted = Vec::new();
-            for chunk in data.chunks(Self::chunk_size(rsa.size())) {
-                let num = BigUint::from_bytes_be(chunk);
+            let mut encrypted = String::new();
+            for block in data.chunks(Self::chunk_size(rsa.size())) {
+                let num = BigUint::from_bytes_be(block);
                 let encrypted_block = num.modpow(&E.into(), rsa.public());
-                let mut encrypted_block = encrypted_block.to_bytes_be();
-                let length: u32 = encrypted_block.len() as u32;
-                println!("Length!: {}", length);
-                encrypted.append(&mut length.to_be_bytes().to_vec());
-                encrypted.append(&mut encrypted_block)
+                // encrypted.extend(encrypted_block.to_bytes_be().iter());
+                encrypted.push_str(&format!("{}?", base64::encode(encrypted_block.to_bytes_be().as_slice())));
             }
-            Ok(base64::encode(&encrypted.as_slice()))
+            Ok(encrypted)
         } else {
             return Err(ErrorKind::UserNotFound)?;
         }
@@ -133,26 +130,12 @@ impl AlgoRSA {
     pub fn decrypt(&self, user: &String, data: &String) -> Result<Vec<u8>, Error> {
         if let Some(rsa) = self.map.borrow().get(user) {
             let mut decrypted = Vec::new();
-            let data = base64::decode(data)?;
-            let mut length: [u8; 4] = Default::default();
-            length.copy_from_slice(&data[0..4]);
-            println!("LENGTH: {:?}", length);
-            let mut usize_length = u32::from_be_bytes(length) as usize;
-            let mut index: usize = 0;
-            loop {
-                println!("length decrypt: {}", usize_length);
-                let encrypted = BigUint::from_bytes_be(&data[(index + 4)..(index + usize_length + 4)]);
-
-                index = 4 + usize_length;
-
+            for data_chunk in data.split('?').filter(|&x| !x.is_empty()) {
+                // println!("DATACHUNK: {}", data_chunk);
+                let raw = base64::decode(&data_chunk)?;
+                let encrypted = BigUint::from_bytes_be(&raw.as_slice());
                 let decrypted_chunk = encrypted.modpow(rsa.private()?, rsa.public());
                 decrypted.append(&mut decrypted_chunk.to_bytes_be());
-
-                println!("USIZE: {}, data: {}, index: {}", usize_length, data.len(), index);
-                if !(index < data.len()) { break }
-
-                length.copy_from_slice(&data[index..index+4]);
-                usize_length = u32::from_be_bytes(length) as usize;
             }
             Ok(decrypted)
         } else {
