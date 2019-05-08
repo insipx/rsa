@@ -7,6 +7,8 @@ use crate::err::ErrorKind;
 use num_bigint::BigUint;
 use std::path::PathBuf;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{Read, Write};
 use structopt::StructOpt;
 use structopt::clap::AppSettings;
 use regex::Regex;
@@ -94,7 +96,7 @@ fn parse_rsa_format(input: &str) -> Result<String, Error> {
     //  actually modifying the base64 in any way would lead to total failure, however
     let re_replace = Regex::new(r"[\t\n]*")?;
     let input = re_replace.replace_all(input, "");
-    let re_base64 = Regex::new(r"-+[ A-Z]+-+([A-Za-z0-9+/=]+)")?;
+    let re_base64 = Regex::new(r"-+[ A-Z]+-+([A-Za-z0-9+/=?]+)")?;
     let base64_cap = re_base64.captures(&input).ok_or(ErrorKind::RegexParse)?;
     Ok(base64_cap.get(1).ok_or(ErrorKind::RegexParse)?.as_str().into())
 }
@@ -133,7 +135,7 @@ impl Opts {
         if let Some(message) = &self.args.decrypt {
             let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
             let message = parse_rsa_format(&message)?;
-            println!("{}", self.rsa.decrypt(&user, &message)?);
+            std::io::stdout().write(self.rsa.decrypt(&user, &message)?.as_slice())?;
         }
 
         Ok(())
@@ -142,7 +144,18 @@ impl Opts {
     pub fn encrypt_dialog(&self) -> Result<(), Error> {
         if let Some(message) = &self.args.encrypt {
             let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
-            let encrypted = self.rsa.encrypt(&user, &message)?;
+            let encrypted = self.rsa.encrypt(&user, &message.as_bytes())?;
+            println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
+            println!("{}", textwrap::fill(&encrypted, 70));
+            println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
+        }
+
+        if let Some(data_file) = &self.args.encrypt_file {
+            let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
+            let mut f = File::open(data_file)?;
+            let mut buffer: Vec<u8> = Vec::new();
+            f.read_to_end(&mut buffer)?;
+            let encrypted = self.rsa.encrypt(&user, &buffer.as_slice())?;
             println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
             println!("{}", textwrap::fill(&encrypted, 70));
             println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
@@ -176,8 +189,8 @@ impl Opts {
     }
 
     pub fn import_dialog(&self) -> Result<(), Error> {
-        let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
         if self.args.import_public.is_some() {
+            let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
             let pubkey = base64::decode(&parse_rsa_format(&self.args.import_public.as_ref().expect("Within checked scope; Q.E.D"))?)?;
             let size = KeySize::from_input(&(pubkey.len() * 8))?;
             let pubkey = BigUint::from_bytes_be(&pubkey);
@@ -186,6 +199,7 @@ impl Opts {
         }
 
         if self.args.import_private.is_some() {
+            let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
             let privkey = base64::decode(&parse_rsa_format(&self.args.import_private.as_ref().expect("Within checked scope; Q.E.D"))?)?;
             self.rsa.import_private(user, &BigUint::from_bytes_be(&privkey))?;
         }
@@ -239,7 +253,7 @@ mod tests {
 
 
 \t
-Onlythisshouldremain
+?Onlythisshouldremain?asdfasjdfdasf
 \n
 
 ------------------ END RSA PUBLIC KEY ---------------------";
