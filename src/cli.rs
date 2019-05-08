@@ -28,6 +28,9 @@ pub struct CLI {
     /// Specify the user for user-specific actions like encrypting, decrypting, and exporting
     user: Option<String>,
 
+    #[structopt(long = "file", short = "f")]
+    output_file: Option<String>,
+
     #[structopt(long = "encrypt", short = "e")]
     /// Encrypt. Requires a String argument that is the data to encrypt
     encrypt: Option<String>,
@@ -39,6 +42,10 @@ pub struct CLI {
     #[structopt(long = "decrypt", short = "d")]
     /// Decrypt data
     decrypt: Option<String>,
+
+    #[structopt(long = "decrypt-file")]
+    /// Decrypt file
+    decrypt_file: Option<String>,
 
     #[structopt(long = "generate", short = "g")]
     /// Generate a new key
@@ -138,16 +145,22 @@ impl Opts {
             std::io::stdout().write(self.rsa.decrypt(&user, &message)?.as_slice())?;
         }
 
+        if let Some(file) = &self.args.decrypt_file {
+            let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
+            let mut file = File::open(file)?;
+            let mut message = String::new();
+            file.read_to_string(&mut message)?;
+            let message = parse_rsa_format(&message)?;
+            std::io::stdout().write(self.rsa.decrypt(&user, &message)?.as_slice())?;
+        }
+
         Ok(())
     }
 
     pub fn encrypt_dialog(&self) -> Result<(), Error> {
         if let Some(message) = &self.args.encrypt {
             let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
-            let encrypted = self.rsa.encrypt(&user, &message.as_bytes())?;
-            println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
-            println!("{}", textwrap::fill(&encrypted, 70));
-            println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
+            self.encrypt(user, &message.as_bytes())?;
         }
 
         if let Some(data_file) = &self.args.encrypt_file {
@@ -155,13 +168,22 @@ impl Opts {
             let mut f = File::open(data_file)?;
             let mut buffer: Vec<u8> = Vec::new();
             f.read_to_end(&mut buffer)?;
-            let encrypted = self.rsa.encrypt(&user, &buffer.as_slice())?;
-            println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
-            println!("{}", textwrap::fill(&encrypted, 70));
-            println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
+            self.encrypt(&user, buffer)?;
         }
 
         Ok(())
+    }
+
+    fn encrypt(&self, user: &String, buffer: Vec<u8>) -> Result<(), Error> {
+        let encrypted = self.rsa.encrypt(user, &buffer.as_slice())?;
+        if self.args.file_output.as_ref().is_some() {
+
+
+        } else {
+            println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
+            println!("{}", textwrap::fill(&encrypted, 70));
+            println!("--------------------- END RSA MESSAGE  -----------------------");
+        }
     }
 
     pub fn export_dialog(&self) -> Result<(), Error> {
