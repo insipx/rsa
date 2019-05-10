@@ -1,7 +1,7 @@
 
 # RSA
 
-Created for Cryptography Class
+Created for Dr. Dougherty's Cryptography Class, Spring 2019
 
 RSA works on both Linux And Windows
 
