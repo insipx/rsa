@@ -29,6 +29,7 @@ pub struct CLI {
     user: Option<String>,
 
     #[structopt(long = "file", short = "f")]
+    /// Specify output file. Output file must not exist
     output_file: Option<String>,
 
     #[structopt(long = "encrypt", short = "e")]
