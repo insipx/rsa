@@ -140,20 +140,33 @@ impl Opts {
 
     pub fn decrypt_dialog(&self) -> Result<(), Error> {
         if let Some(message) = &self.args.decrypt {
-            let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
-            let message = parse_rsa_format(&message)?;
-            std::io::stdout().write(self.rsa.decrypt(&user, &message)?.as_slice())?;
+            self.decrypt(message)?;
         }
 
         if let Some(file) = &self.args.decrypt_file {
-            let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
             let mut file = File::open(file)?;
             let mut message = String::new();
             file.read_to_string(&mut message)?;
-            let message = parse_rsa_format(&message)?;
-            std::io::stdout().write(self.rsa.decrypt(&user, &message)?.as_slice())?;
+            self.decrypt(&message)?;
         }
+        Ok(())
+    }
 
+    fn decrypt(&self, message: &String) -> Result<(), Error> {
+        let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
+        let message = parse_rsa_format(message)?;
+        let message = base64::decode(&message)?;
+        let message: Vec<BigUint> = bincode::deserialize(&message)?;
+        let decrypted = self.rsa.decrypt(&user, message)?;
+
+        if let Some(file) = &self.args.output_file {
+            let mut file = Self::handle_paths(file)?;
+            file.write_all(&decrypted)?;
+            file.flush()?;
+        } else {
+            std::io::stdout().write(decrypted.as_slice())?;
+            std::io::stdout().flush()?;
+        }
         Ok(())
     }
 
@@ -165,24 +178,46 @@ impl Opts {
 
         if let Some(data_file) = &self.args.encrypt_file {
             let user = self.args.user.as_ref().ok_or(ErrorKind::NoUserSpecified)?;
-            let mut f = File::open(data_file)?;
+            let mut f = Self::handle_paths(data_file)?;
             let mut buffer: Vec<u8> = Vec::new();
             f.read_to_end(&mut buffer)?;
-            self.encrypt(&user, buffer)?;
+            self.encrypt(&user, &buffer.as_slice())?;
         }
 
         Ok(())
     }
 
-    fn encrypt(&self, user: &String, buffer: Vec<u8>) -> Result<(), Error> {
-        let encrypted = self.rsa.encrypt(user, &buffer.as_slice())?;
-        if self.args.file_output.as_ref().is_some() {
+    fn encrypt(&self, user: &String, buffer: &[u8]) -> Result<(), Error> {
+        let encrypted = self.rsa.encrypt(user, buffer)?;
+        let encrypted = bincode::serialize(&encrypted)?; //serializing Vec<Vec<u8>>
+        let mut encrypted = base64::encode(&encrypted).into_bytes();
+        let length = encrypted.len();
+        let added_lines = encrypted.len() / 75;
+        encrypted.resize(encrypted.len() + added_lines, 0);
+        line_wrap::line_wrap(encrypted.as_mut_slice(), length, 75, &line_wrap::lf());
 
-
+        if let Some(file) = &self.args.output_file {
+            let mut file = Self::handle_paths(file)?;
+            file.write(b"--------------------- BEGIN RSA MESSAGE  ---------------------\n")?;
+            file.write_all(&encrypted.as_slice())?;
+            file.write_all(b"\n--------------------- END RSA MESSAGE  ---------------------")?;
+            file.flush()?;
         } else {
-            println!("--------------------- BEGIN RSA MESSAGE  ---------------------");
-            println!("{}", textwrap::fill(&encrypted, 70));
-            println!("--------------------- END RSA MESSAGE  -----------------------");
+            let out = std::io::stdout();
+            let mut handle = out.lock();
+            handle.write(b"--------------------- BEGIN RSA MESSAGE  ---------------------\n")?;
+            handle.write(encrypted.as_slice())?;
+            handle.write(b"\n--------------------- END RSA MESSAGE  -----------------------")?;
+        }
+        Ok(())
+    }
+
+    fn handle_paths(path: &String) -> Result<File, Error> {
+        let path = PathBuf::from(path);
+        if !path.exists() {
+            Ok(File::create(path)?)
+        } else {
+            Ok(File::open(path)?)
         }
     }
 

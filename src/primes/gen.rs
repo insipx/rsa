@@ -16,7 +16,7 @@ const MINIMUM_KEY_LENGTH: usize = 256;
 /// If that fails to generate enough entropy, then this will fallback to generating entropy from
 /// "System Jitters" (Random number generator based on jitter in the CPU execution time, and jitter in memory access time.
 /// This is significantly slower than OS operations).
-/// For more information on random number gens, take a gander at rand::rngs::EntropyRng
+/// For more information on random number gens, take a look at rand::rngs::EntropyRng documentation on http://docs.rs
 pub struct NumberGenerator<'a> {
     /// Total Size of Public key (n = pq) where n is the public key
     size: &'a KeySize,
@@ -114,8 +114,7 @@ impl ProbableVariant {
         }
     }
 
-    /// The Candidate prime number and how many rounds (k) to process or miller-rabin
-    /// (How many rounds of miller rabin to use)
+    /// The Candidate prime number and how many rounds (k) to process of miller-rabin
     pub fn rabin_miller(candidate: &BigUint, rounds: usize) -> Self {
 
         let candidate_minus_one = candidate - BigUint::one();

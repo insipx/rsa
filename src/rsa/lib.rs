@@ -5,9 +5,10 @@ use crate::math;
 use crate::err::ErrorKind;
 use std::collections::HashMap;
 use std::cell::RefCell;
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 use num_traits::{Zero};
 use serde::{Serialize, Deserialize};
+use rayon::prelude::*;
 use failure::{Error};
 
 pub const E: usize = 65537; // the encryption exponent
@@ -108,18 +109,15 @@ impl AlgoRSA {
     // 5.Alice encrypts m as c = m^e (mod n) and sends c to bob
     // 6. Bob decrypts by computing m = c^d (mod n)
     //
-    // Returns a Base64-encoded string that is the encrypted message
     // User here is the user the message is being encrypted for
-    // TODO: accept a message *as bytes* allowing for anything to be encrypted
-    pub fn encrypt(&self, user: &String, data: &[u8]) -> Result<String, Error> {
+    //accepts a message *as bytes* allowing for anything to be encrypted
+    pub fn encrypt(&self, user: &String, data: &[u8]) -> Result<Vec<BigUint>, Error> {
         // TODO: change so base64 is only used once
         if let Some(rsa) = self.map.borrow().get(user) {
-            let mut encrypted = String::new();
+            let mut encrypted = Vec::new();
             for block in data.chunks(Self::chunk_size(rsa.size())) {
-                let num = BigUint::from_bytes_be(block);
-                let encrypted_block = num.modpow(&E.into(), rsa.public());
-                // encrypted.extend(encrypted_block.to_bytes_be().iter());
-                encrypted.push_str(&format!("{}?", base64::encode(encrypted_block.to_bytes_be().as_slice())));
+                let num = BigUint::from_bytes_be(block).modpow(&E.into(), rsa.public());
+                encrypted.push(num)
             }
             Ok(encrypted)
         } else {
@@ -127,24 +125,19 @@ impl AlgoRSA {
         }
     }
 
-    pub fn decrypt(&self, user: &String, data: &String) -> Result<Vec<u8>, Error> {
+    pub fn decrypt(&self, user: &String, data: Vec<BigUint>) -> Result<Vec<u8>, Error> {
         if let Some(rsa) = self.map.borrow().get(user) {
-            let mut decrypted = Vec::new();
-            for data_chunk in data.split('?').filter(|&x| !x.is_empty()) {
-                // println!("DATACHUNK: {}", data_chunk);
-                let raw = base64::decode(&data_chunk)?;
-                let encrypted = BigUint::from_bytes_be(&raw.as_slice());
-                let decrypted_chunk = encrypted.modpow(rsa.private()?, rsa.public());
-                decrypted.append(&mut decrypted_chunk.to_bytes_be());
-            }
-            Ok(decrypted)
+            let private = rsa.private()?;
+            Ok(data.into_par_iter().map(|data_chunk| {
+                data_chunk.modpow(private, rsa.public()).to_bytes_be()
+            }).flatten().collect())
         } else {
             return Err(ErrorKind::UserNotFound)?;
         }
     }
 
     fn chunk_size(key_size: &KeySize) -> usize {
-        (key_size.as_num() - 16) / 8
+        ((key_size.as_num()) / 8)
     }
 
     pub fn import(&self, user: &str, opts: RSA) {
