@@ -9,14 +9,14 @@ I do not own a MAC, so RSA is not tested to compile on MacOSX. However, my assum
 
 ## To Run On Windows
 - Download Windows Binary (Requires 64bit PC): [RSA Windows
-  Binary](https://github.com/insipx/rsa/releases/download/1/RSA.Windows.64Bit.exe)
+  Binary](https://github.com/insipx/rsa/releases/download/0.2.0/RSA.Windows.64Bit.exe)
 - place the binary in any folder you like
 - navigate to the folder you placed the binary in with PowerShell
 - Run RSA! `./rsa --help`
 
 ## To Run on Linux
 - Download the Linux Binary (Requires 64bit PC): [RSA
-  Linux](https://github.com/insipx/rsa/releases/download/1/RSA.GNU.Linux.64bit)
+  Linux](https://github.com/insipx/rsa/releases/download/0.2.0/RSA.Linux.64bit)
 - place linux binary in a directory specified in PATH or just a directory you want to execute from
 - `./rsa --help` while in same directory
 
